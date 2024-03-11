@@ -11,7 +11,7 @@ package usr_types_and_params;
   parameter MIN_DELAY                 = 0;
   parameter MAX_TR_LEN                = 5;
   parameter TIMEOUT                   = MAX_TR_LEN * MAX_DELAY * 2;
-  parameter READ_TIMEOUT              = MAX_TR_LEN*5;
+  parameter READ_TIMEOUT              = MAX_DELAY;
   parameter MAX_DATA_VALUE            = 2**DATA_IN_W - 1;
   parameter NUMBER_OF_ONE_LENGHT_RUNS = 5;
 

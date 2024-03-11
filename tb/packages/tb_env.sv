@@ -13,6 +13,7 @@ package tb_env;
     string      message;
     int         time_of_start;
     empty_in_t  empty_in;
+    bit         set_startofpacket_low;
     
   endclass
   
@@ -31,13 +32,14 @@ package tb_env;
 
       Transaction tr;
       
-      // tr = new;
+      // tr = new();
       // // Random transactions without empty symbols
       // repeat (NUMBER_OF_TEST_RUNS)
       //   begin
-      //     tr.message = "Transaction with random parameters";
-      //     tr.len     = $urandom_range( MAX_TR_LEN, 1 );
-      //     tr.channel = $urandom_range( 2**CHANNEL_W, 0 );
+      //     tr.message  = "Transaction with random parameters";
+      //     tr.len      = $urandom_range( MAX_TR_LEN, 1 );
+      //     tr.channel  = $urandom_range( 2**CHANNEL_W, 0 );
+      //     tr.empty_in = '0;
       //     repeat(tr.len)
       //       begin
       //         tr.ready_i_delays.push_back( $urandom_range( MAX_DELAY, MIN_DELAY ) );
@@ -165,9 +167,9 @@ package tb_env;
             continue;
           else
             begin
-              vif.ast_startofpacket_i <= 1'b0;
               repeat( tr.valid_i_delays.pop_back() )
                 begin
+                  vif.ast_valid_i <= 1'b0;
                   @( posedge vif.clk );
                 end
               vif.ast_data_i  <= tr.in_data.pop_back();
@@ -197,6 +199,8 @@ package tb_env;
 
       while (1)
         begin
+          @( posedge vif.clk );
+
           if ( read_timeout == READ_TIMEOUT )
             begin
               $error("There is no startofpacket_o after endofpacket_i!!!");
@@ -206,7 +210,6 @@ package tb_env;
             begin
               start_of_packet_flag = 1;
             end
-          @( posedge vif.clk );
 
           if ( vif.ast_valid_o === 1'b1 && start_of_packet_flag )
             begin
@@ -280,7 +283,10 @@ package tb_env;
         begin
           @( posedge vif.clk );
           if ( vif.srst_i === 1'b1 )
-            continue;
+            begin
+              timeout = 0;
+              continue;
+            end
 
           if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 )
             begin

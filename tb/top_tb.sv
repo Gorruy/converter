@@ -12,10 +12,8 @@ module top_tb;
 
   ast_width_extender #(
   .DATA_IN_W           ( DATA_IN_W                  ),
-  .EMPTY_IN_W          ( EMPTY_IN_W                 ),
   .CHANNEL_W           ( CHANNEL_W                  ),
-  .DATA_OUT_W          ( DATA_OUT_W                 ),
-  .EMPTY_OUT_W         ( EMPTY_OUT_W                )
+  .DATA_OUT_W          ( DATA_OUT_W                 )
   ) ast_inst (
   .clk_i               ( clk                        ),
   .srst_i              ( ast_if.srst_i              ),
