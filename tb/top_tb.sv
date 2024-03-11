@@ -8,7 +8,7 @@ module top_tb;
 
   initial forever #5 clk = !clk;
 
-  ast_interface ast_if ( clk );
+  ast_interface ast_if ( .clk(clk) );
 
   ast_width_extender #(
   .DATA_IN_W           ( DATA_IN_W                  ),

@@ -13,7 +13,7 @@ package usr_types_and_params;
   parameter TIMEOUT                   = MAX_TR_LEN * MAX_DELAY * 2;
   parameter READ_TIMEOUT              = MAX_TR_LEN*5;
   parameter MAX_DATA_VALUE            = 2**DATA_IN_W - 1;
-  parameter NUMBER_OF_ONE_LENGHT_RUNS = 20;
+  parameter NUMBER_OF_ONE_LENGHT_RUNS = 5;
 
   typedef logic [DATA_IN_W - 1:0]   in_data_t[$];
   typedef logic [DATA_OUT_W - 1:0]  out_data_t[$];

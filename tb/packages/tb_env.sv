@@ -3,6 +3,7 @@ package tb_env;
   import usr_types_and_params::*;
   
   class Transaction;
+  // This class will hold all info about single transaction
 
     in_data_t   in_data;
     int         len;
@@ -16,6 +17,7 @@ package tb_env;
   endclass
   
   class Generator;
+  // This class will generate random transactions
 
     mailbox #( Transaction ) generated_transactions;
 
@@ -46,23 +48,6 @@ package tb_env;
       //     generated_transactions.put(tr);
       //   end
 
-      tr         = new();
-      tr.message = "Transactions of length one started";
-      // Many transactions of length one
-      repeat (NUMBER_OF_ONE_LENGHT_RUNS)
-        begin
-          tr.len      = 1;
-          tr.channel  = $urandom_range( 2**CHANNEL_W, 0 );
-          tr.empty_in = '0;
-          tr.ready_i_delays.push_back(0);
-          tr.valid_i_delays.push_back(0);
-          tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          generated_transactions.put(tr);
-          tr         = new();
-          tr.message = "another one length transaction";
-        end
-
       // generates configurations with ones or witout any delays without empty symbols
       for ( int wr_delay = 0; wr_delay <= 1; wr_delay++ )
         begin
@@ -85,11 +70,45 @@ package tb_env;
             end
         end
 
+      // Transaction of max length with random channel and empty info without delays
+      tr          = new();
+      tr.message  = "Transactions with empty symbols";
+      tr.len      = MAX_TR_LEN;
+      tr.channel  = $urandom_range( 2**CHANNEL_W, 1 );
+      tr.empty_in = $urandom_range( 2**EMPTY_IN_W, 1 );
+      repeat(tr.len)
+        begin
+          tr.valid_i_delays.push_back(0);
+          tr.ready_i_delays.push_back(0);
+          tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+        end
+
+      generated_transactions.put(tr);
+
+      // Many transactions of length one
+      tr         = new();
+      tr.message = "Transactions of length one started";
+      repeat (NUMBER_OF_ONE_LENGHT_RUNS)
+        begin
+          tr.len      = 1;
+          tr.channel  = $urandom_range( 2**CHANNEL_W, 0 );
+          tr.empty_in = '0;
+          tr.ready_i_delays.push_back(0);
+          tr.valid_i_delays.push_back(0);
+          tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          generated_transactions.put(tr);
+          tr         = new();
+          tr.message = "another one length transaction";
+        end
+
     endtask 
     
   endclass
 
   class Driver;
+  // This class will drive all dut input signals
+  // according to transaction's parameters
 
     virtual ast_interface    vif;
     mailbox #( Transaction ) generated_transactions;
@@ -111,15 +130,15 @@ package tb_env;
         begin
           generated_transactions.get(tr);
           tr.time_of_start = $time();
-          $display(tr.message);
-
-          if (tr.len != 1)
-            reset();
+          // $display(tr.message);
 
           fork
             write(tr);
             read(tr);
           join
+
+          if ( tr.len != 1 )
+            reset();
 
         end
 
@@ -132,37 +151,41 @@ package tb_env;
           @( posedge vif.clk );
         end
 
-      vif.ast_data_i          = tr.in_data.pop_back();
-      vif.ast_startofpacket_i = 1'b1;
-      vif.ast_valid_i         = 1'b1;
+      vif.ast_data_i          <= tr.in_data.pop_back();
+      vif.ast_startofpacket_i <= 1'b1;
+      vif.ast_valid_i         <= 1'b1;
+      vif.ast_channel_i       <= tr.channel;
 
       while ( tr.in_data.size() > 0 )
         begin
           @( posedge vif.clk );
+          vif.ast_startofpacket_i <= 1'b0;
 
           if ( vif.ast_ready_o !== 1'b1 )
             continue;
           else
             begin
-              vif.ast_startofpacket_i = 1'b0;
+              vif.ast_startofpacket_i <= 1'b0;
               repeat( tr.valid_i_delays.pop_back() )
                 begin
                   @( posedge vif.clk );
                 end
-              vif.ast_data_i  = tr.in_data.pop_back();
-              vif.ast_valid_i = 1'b1;
+              vif.ast_data_i  <= tr.in_data.pop_back();
+              vif.ast_valid_i <= 1'b1;
             end
         end
       
-      vif.ast_endofpacket_i = 1'b1;
-      vif.ast_empty_i       = tr.empty_in;
+      vif.ast_endofpacket_i   <= 1'b1;
+      vif.ast_empty_i         <= tr.empty_in;
       @( posedge vif.clk );
-      vif.ast_endofpacket_i = 1'b0;
-      vif.ast_valid_i       = 1'b0;
+      vif.ast_endofpacket_i   <= 1'b0;
+      vif.ast_valid_i         <= 1'b0;
+      vif.ast_startofpacket_i <= 1'b0;
 
     endtask
 
     task read ( input Transaction tr );
+    // Task to set ready_i delays and check for timeouts
 
       int start_of_packet_flag;
       int read_timeout;
@@ -170,12 +193,15 @@ package tb_env;
       read_timeout         = 0;
       start_of_packet_flag = 0;
       
-      vif.ast_ready_i = 1'b1;
+      vif.ast_ready_i <= 1'b1;
 
       while (1)
         begin
           if ( read_timeout == READ_TIMEOUT )
-            return;
+            begin
+              $error("There is no startofpacket_o after endofpacket_i!!!");
+              return;
+            end
           if ( vif.ast_startofpacket_o === 1'b1 )
             begin
               start_of_packet_flag = 1;
@@ -184,12 +210,12 @@ package tb_env;
 
           if ( vif.ast_valid_o === 1'b1 && start_of_packet_flag )
             begin
-              vif.ast_ready_i = 1'b0;
+              vif.ast_ready_i <= 1'b0;
               repeat(tr.ready_i_delays.pop_back())
                 begin
                   @( posedge vif.clk );
                 end
-              vif.ast_ready_i = 1'b1;
+              vif.ast_ready_i <= 1'b1;
             end
 
           if ( vif.ast_endofpacket_o === 1'b1 )
@@ -211,6 +237,8 @@ package tb_env;
   endclass
   
   class Monitor;
+  // This class will gather both input and output data from dut
+  // and send it to Scoreboard
 
     virtual ast_interface    vif;
 
@@ -233,8 +261,6 @@ package tb_env;
 
     task run;
 
-    int c;
-
       while ( timeout < TIMEOUT )
         begin
           fork
@@ -250,33 +276,35 @@ package tb_env;
       symb_data_t data;
       data = {}; 
 
-      while ( ( vif.ast_startofpacket_i !== 1'b1 || vif.srst_i === 1'b1 ) &&
-                timeout++ < TIMEOUT )
-        @( posedge vif.clk );
-
-      while ( vif.srst_i !== 1'b1 && timeout++ < TIMEOUT )
+      while ( timeout++ < TIMEOUT )
         begin
           @( posedge vif.clk );
+          if ( vif.srst_i === 1'b1 )
+            continue;
 
-          if ( vif.ast_endofpacket_i === 1'b1 )
+          if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 )
             begin
-              timeout = 0;
-
-              for ( int i = 0; i <= 2**EMPTY_IN_W - vif.ast_empty_i; i++ )
+              // Transaction without errors can be finished only with endofpacket raised
+              if ( vif.ast_endofpacket_i === 1'b1 )
                 begin
-                  data.push_back( vif.ast_data_i[i*8 +: 8] );
+                  timeout = 0;
+
+                  for ( int i = 0; i < 2**EMPTY_IN_W - vif.ast_empty_i; i++ )
+                    begin
+                      data.push_back( vif.ast_data_i[i*8 +: 8] );
+                    end
+
+                  input_data.put(data);
+                  return;
                 end
-
-              input_data.put(data);
-              return;
-            end
-          else if ( vif.ast_valid_o === 1'b1 && vif.ast_ready_i === 1'b1 )
-            begin
-              timeout = 0;
-
-              for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
+              else
                 begin
-                  data.push_back( vif.ast_data_i[i*8 +: 8] );
+                  timeout = 0;
+
+                  for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
+                    begin
+                      data.push_back( vif.ast_data_i[i*8 +: 8] );
+                    end
                 end
             end
         end
@@ -296,27 +324,31 @@ package tb_env;
         begin
           @( posedge vif.clk );
 
-          if ( vif.ast_endofpacket_o === 1'b1 )
+          if ( vif.ast_valid_o === 1'b1 && vif.ast_ready_i === 1'b1 )
             begin
-              timeout = 0;
-
-              for ( int i = 0; i <= 2**EMPTY_OUT_W - vif.ast_empty_o; i++ )
+              // Valid transaction without errors can be finished only with endofpacket raised
+              if ( vif.ast_endofpacket_o === 1'b1 )
                 begin
-                  data.push_back( vif.ast_data_o[i*8 +: 8] );
-                end
+                  timeout = 0;
 
-              output_data.put(data);
-              return;
+                  for ( int i = 0; i < 2**EMPTY_OUT_W - vif.ast_empty_o; i++ )
+                    begin
+                      data.push_back( vif.ast_data_o[i*8 +: 8] );
+                    end
+
+                  output_data.put(data);
+                  return;
+                end
+              else
+                begin
+                  timeout = 0;
+
+                  for ( int i = 0; i < 2**EMPTY_OUT_W; i++ )
+                    begin
+                      data.push_back( vif.ast_data_o[i*8 +: 8] );
+                    end
+                end  
             end
-          else if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 )
-            begin
-              timeout = 0;
-
-              for ( int i = 0; i < 2**EMPTY_OUT_W; i++ )
-                begin
-                  data.push_back( vif.ast_data_o[i*8 +: 8] );
-                end
-            end  
         end
 
     endtask
@@ -324,6 +356,7 @@ package tb_env;
   endclass
   
   class Scoreboard;
+  // This class will compare read and written data
 
     mailbox #( symb_data_t ) input_data;
     mailbox #( symb_data_t ) output_data;
@@ -342,7 +375,10 @@ package tb_env;
       symb_data_t in_data;
       symb_data_t out_data;
 
-      while ( input_data.num() )
+      if ( input_data.num() !== output_data.num() )
+        $error("Number of read and written transactions doesn't equal, wr:%d, rd:%d", input_data.num(), output_data.num() );
+
+      while ( input_data.num() && output_data.num() )
         begin
           input_data.get(in_data);
           output_data.get(out_data);
@@ -350,14 +386,21 @@ package tb_env;
           if ( in_data.size() != out_data.size() )
             begin
               $error("data sizes dont match!: wr size:%d, rd size:%d ",in_data.size(), out_data.size() );
-              $displayh("wr data:%p, rd data:%p", in_data, out_data );
+              $displayh("wr data:%p", in_data );
+              $displayh("rd data:%p", out_data );
             end
           else
             begin
-              while ( in_data.size() )
+              foreach( in_data[i] )
                 begin
-                  if ( in_data.pop_back() != out_data.pop_back() )
-                    $error("wrong data");
+                  if ( in_data[i] != out_data[i] )
+                    begin
+                      $error("wrong data!");
+                      $displayh("wr data:%p", in_data );
+                      $displayh("rd data:%p", out_data );
+                      $display("Index: %d", i );
+                      break;
+                    end
                 end
             end
         end
@@ -367,6 +410,7 @@ package tb_env;
   endclass
 
   class Environment;
+  // This class will hold all tb elements together
     
     Driver     driver;
     Monitor    monitor;
@@ -397,6 +441,7 @@ package tb_env;
     
       generator.run();
   
+      @( posedge vif.clk );
       fork 
         driver.run();
         monitor.run();
