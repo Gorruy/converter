@@ -3,7 +3,7 @@ package tb_env;
   import usr_types_and_params::*;
   
   class Transaction;
-  // This class will hold all info about single transaction
+  // Instance of this class will hold all info about single transaction
 
     in_data_t   in_data;
     int         len;
@@ -31,24 +31,6 @@ package tb_env;
     task run;
 
       Transaction tr;
-      
-      // tr = new();
-      // // Random transactions without empty symbols
-      // repeat (NUMBER_OF_TEST_RUNS)
-      //   begin
-      //     tr.message  = "Transaction with random parameters";
-      //     tr.len      = $urandom_range( MAX_TR_LEN, 1 );
-      //     tr.channel  = $urandom_range( 2**CHANNEL_W, 0 );
-      //     tr.empty_in = '0;
-      //     repeat(tr.len)
-      //       begin
-      //         tr.ready_i_delays.push_back( $urandom_range( MAX_DELAY, MIN_DELAY ) );
-      //         tr.valid_i_delays.push_back( $urandom_range( MAX_DELAY, MIN_DELAY ) );
-      //         tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-      //       end
-
-      //     generated_transactions.put(tr);
-      //   end
 
       // generates configurations with ones or witout any delays without empty symbols
       for ( int wr_delay = 0; wr_delay <= 1; wr_delay++ )
@@ -104,6 +86,42 @@ package tb_env;
           tr.message = "another one length transaction";
         end
 
+      // Transactions of max length with progressions of empty
+      for ( int i = 0; i < 2**EMPTY_OUT_W; i++ )
+        begin
+          tr          = new();
+          tr.message  = "Transactions with empty symbols";
+          tr.len      = MAX_TR_LEN;
+          tr.channel  = $urandom_range( 2**CHANNEL_W, 1 );
+          tr.empty_in = i;
+          repeat(tr.len)
+            begin
+              tr.valid_i_delays.push_back(0);
+              tr.ready_i_delays.push_back(0);
+              tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+            end
+
+          generated_transactions.put(tr);
+        end
+
+      // Random transactions without empty symbols
+      repeat (NUMBER_OF_TEST_RUNS)
+        begin
+          tr          = new();
+          tr.message  = "Transaction with random parameters";
+          tr.len      = $urandom_range( MAX_TR_LEN, 2 );
+          tr.channel  = $urandom_range( 2**CHANNEL_W - 1, 0 );
+          tr.empty_in = '0;
+          repeat(tr.len)
+            begin
+              tr.ready_i_delays.push_back( $urandom_range( MAX_DELAY, MIN_DELAY ) );
+              tr.valid_i_delays.push_back( $urandom_range( MAX_DELAY, MIN_DELAY ) );
+              tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+            end
+
+          generated_transactions.put(tr);
+        end
+
     endtask 
     
   endclass
@@ -131,7 +149,7 @@ package tb_env;
       while ( generated_transactions.num() )
         begin
           generated_transactions.get(tr);
-          tr.time_of_start = $time();
+          //tr.time_of_start = $time();
           // $display(tr.message);
 
           fork
@@ -139,6 +157,7 @@ package tb_env;
             read(tr);
           join
 
+          // case with many tr of one length should be ran without resets
           if ( tr.len != 1 )
             reset();
 
@@ -187,12 +206,12 @@ package tb_env;
     endtask
 
     task read ( input Transaction tr );
-    // Task to set ready_i delays and check for timeouts
+    // Task to set ready_i delays and check for timeout_ctrs
 
       int start_of_packet_flag;
-      int read_timeout;
+      int read_timeout_ctr;
 
-      read_timeout         = 0;
+      read_timeout_ctr         = 0;
       start_of_packet_flag = 0;
       
       vif.ast_ready_i <= 1'b1;
@@ -200,20 +219,28 @@ package tb_env;
       while (1)
         begin
           @( posedge vif.clk );
-
-          if ( read_timeout == READ_TIMEOUT )
+          if ( vif.ast_startofpacket_i === 1'b1 )
             begin
-              $error("There is no startofpacket_o after endofpacket_i!!!");
+              read_timeout_ctr = 0;
+            end
+
+          if ( read_timeout_ctr == READ_TIMEOUT )
+            begin
+              $error("There is no startofpacket_o after startofpacket_i!!!");
               return;
             end
           if ( vif.ast_startofpacket_o === 1'b1 )
             begin
+              read_timeout_ctr         = 0;
               start_of_packet_flag = 1;
             end
+          else
+            read_timeout_ctr += 1;
 
           if ( vif.ast_valid_o === 1'b1 && start_of_packet_flag )
             begin
-              vif.ast_ready_i <= 1'b0;
+              vif.ast_ready_i     <= 1'b0;
+              start_of_packet_flag = 0;
               repeat(tr.ready_i_delays.pop_back())
                 begin
                   @( posedge vif.clk );
@@ -223,8 +250,6 @@ package tb_env;
 
           if ( vif.ast_endofpacket_o === 1'b1 )
             return;
-          else
-            read_timeout += 1;
 
         end
 
@@ -232,9 +257,9 @@ package tb_env;
 
     task reset;
       @( posedge vif.clk );
-      vif.srst_i = 1'b1;
+      vif.srst_i <= 1'b1;
       @( posedge vif.clk );
-      vif.srst_i = 1'b0;
+      vif.srst_i <= 1'b0;
     endtask
   
   endclass
@@ -248,7 +273,7 @@ package tb_env;
     mailbox #( symb_data_t ) input_data;
     mailbox #( symb_data_t ) output_data;
 
-    int                      timeout;
+    int                      timeout_ctr;
 
     function new ( input virtual ast_interface dut_interface,
                    mailbox #( symb_data_t )    in_data,
@@ -258,13 +283,13 @@ package tb_env;
       vif         = dut_interface;
       input_data  = in_data;
       output_data = out_data;
-      timeout     = 0;
+      timeout_ctr = 0;
 
     endfunction
 
     task run;
 
-      while ( timeout < TIMEOUT )
+      while ( timeout_ctr < TIMEOUT )
         begin
           fork
             get_input_data();
@@ -277,23 +302,29 @@ package tb_env;
     task get_input_data;
 
       symb_data_t data;
-      data = {}; 
+      int         start_of_packet_flag;
 
-      while ( timeout++ < TIMEOUT )
+      start_of_packet_flag = 0;
+      data                 = {}; 
+
+      while ( timeout_ctr++ < TIMEOUT )
         begin
           @( posedge vif.clk );
+
+          if ( vif.ast_startofpacket_i === 1'b1 )
+            start_of_packet_flag = 1;
           if ( vif.srst_i === 1'b1 )
             begin
-              timeout = 0;
+              timeout_ctr = 0;
               continue;
             end
-
-          if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 )
+            
+          if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 && start_of_packet_flag )
             begin
               // Transaction without errors can be finished only with endofpacket raised
               if ( vif.ast_endofpacket_i === 1'b1 )
                 begin
-                  timeout = 0;
+                  timeout_ctr = 0;
 
                   for ( int i = 0; i < 2**EMPTY_IN_W - vif.ast_empty_i; i++ )
                     begin
@@ -305,7 +336,7 @@ package tb_env;
                 end
               else
                 begin
-                  timeout = 0;
+                  timeout_ctr = 0;
 
                   for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
                     begin
@@ -315,27 +346,36 @@ package tb_env;
             end
         end
 
+
     endtask
 
     task get_output_data;
 
       symb_data_t data;
-      data = {};
+      int         start_of_packet_flag;
 
-      while ( ( vif.ast_startofpacket_o !== 1'b1 || vif.srst_i === 1'b1 ) &&
-                timeout++ < TIMEOUT )
-        @( posedge vif.clk );
+      start_of_packet_flag = 0;
+      data                 = {};
 
-      while ( vif.srst_i !== 1'b1 && timeout++ < TIMEOUT )
+
+      while ( timeout_ctr++ < TIMEOUT )
         begin
           @( posedge vif.clk );
 
-          if ( vif.ast_valid_o === 1'b1 && vif.ast_ready_i === 1'b1 )
+          if ( vif.ast_startofpacket_i === 1'b1 )
+            start_of_packet_flag = 1;
+          if ( vif.srst_i === 1'b1 )
+            begin
+              timeout_ctr = 0;
+              continue;
+            end
+
+          if ( vif.ast_valid_o === 1'b1 && vif.ast_ready_i === 1'b1 && start_of_packet_flag )
             begin
               // Valid transaction without errors can be finished only with endofpacket raised
               if ( vif.ast_endofpacket_o === 1'b1 )
                 begin
-                  timeout = 0;
+                  timeout_ctr = 0;
 
                   for ( int i = 0; i < 2**EMPTY_OUT_W - vif.ast_empty_o; i++ )
                     begin
@@ -347,7 +387,7 @@ package tb_env;
                 end
               else
                 begin
-                  timeout = 0;
+                  timeout_ctr = 0;
 
                   for ( int i = 0; i < 2**EMPTY_OUT_W; i++ )
                     begin
