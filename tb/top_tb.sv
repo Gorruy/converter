@@ -64,6 +64,8 @@ module top_tb;
 
       env.run();
 
+      $stop();
+
     end
 
 

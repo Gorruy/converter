@@ -53,7 +53,7 @@ package tb_env;
         begin
           tr.len      = 1;
           tr.channel  = $urandom_range( 2**CHANNEL_W, 0 );
-          tr.empty_in = (EMPTY_IN_W)'('1) - (EMPTY_OUT_W)'('1);
+          tr.empty_in = '0;
           tr.ready_i_delays.push_back(0);
           tr.valid_i_delays.push_back(0);
           tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
@@ -68,9 +68,10 @@ package tb_env;
         begin
           for ( int rd_delay = 0; rd_delay <= 1; rd_delay++ )
             begin
-              tr         = new();
-              tr.len     = MAX_TR_LEN;
-              tr.channel = '0;
+              tr          = new();
+              tr.len      = MAX_TR_LEN;
+              tr.channel  = '0;
+              tr.empty_in = '0;
               repeat(tr.len)
                 begin
                   tr.valid_i_delays.push_back(wr_delay);
@@ -78,7 +79,7 @@ package tb_env;
                   tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
                 end
               
-              tr.message = { wr_delay == 0 ? "Write without delay and": "Writing with delay of one clk cycle",
+              tr.message = { wr_delay == 0 ? "Write without delay and ": "Writing with delay of one clk cycle ",
                              rd_delay == 0 ? "read without delay": "reading with delay of one clk cycle"  };
               generated_transactions.put(tr);
             end
@@ -104,7 +105,7 @@ package tb_env;
 
     task run;
 
-    Transaction tr;
+      Transaction tr;
 
       while ( generated_transactions.num() )
         begin
@@ -112,10 +113,14 @@ package tb_env;
           tr.time_of_start = $time();
           $display(tr.message);
 
+          if (tr.len != 1)
+            reset();
+
           fork
             write(tr);
             read(tr);
-          join_any
+          join
+
         end
 
     endtask
@@ -158,15 +163,26 @@ package tb_env;
     endtask
 
     task read ( input Transaction tr );
+
+      int start_of_packet_flag;
+      int read_timeout;
+
+      read_timeout         = 0;
+      start_of_packet_flag = 0;
       
       vif.ast_ready_i = 1'b1;
-      wait( vif.ast_startofpacket_o === 1'b1 );
 
-      do
+      while (1)
         begin
+          if ( read_timeout == READ_TIMEOUT )
+            return;
+          if ( vif.ast_startofpacket_o === 1'b1 )
+            begin
+              start_of_packet_flag = 1;
+            end
           @( posedge vif.clk );
 
-          if ( vif.ast_valid_o === 1'b1 )
+          if ( vif.ast_valid_o === 1'b1 && start_of_packet_flag )
             begin
               vif.ast_ready_i = 1'b0;
               repeat(tr.ready_i_delays.pop_back())
@@ -176,8 +192,20 @@ package tb_env;
               vif.ast_ready_i = 1'b1;
             end
 
-        end while ( vif.ast_endofpacket_o !== 1'b1 );
+          if ( vif.ast_endofpacket_o === 1'b1 )
+            return;
+          else
+            read_timeout += 1;
 
+        end
+
+    endtask
+
+    task reset;
+      @( posedge vif.clk );
+      vif.srst_i = 1'b1;
+      @( posedge vif.clk );
+      vif.srst_i = 1'b0;
     endtask
   
   endclass
@@ -205,40 +233,54 @@ package tb_env;
 
     task run;
 
-      while ( timeout != TIMEOUT + 1 )
-        begin
+    int c;
 
+      while ( timeout < TIMEOUT )
+        begin
           fork
             get_input_data();
             get_output_data();
           join
-
         end
+
     endtask
 
     task get_input_data;
 
       symb_data_t data;
-      data = {};
+      data = {}; 
 
-      while ( vif.ast_startofpacket_o !== 1'b1 )
+      while ( ( vif.ast_startofpacket_i !== 1'b1 || vif.srst_i === 1'b1 ) &&
+                timeout++ < TIMEOUT )
+        @( posedge vif.clk );
+
+      while ( vif.srst_i !== 1'b1 && timeout++ < TIMEOUT )
         begin
           @( posedge vif.clk );
-          timeout += 1;
+
+          if ( vif.ast_endofpacket_i === 1'b1 )
+            begin
+              timeout = 0;
+
+              for ( int i = 0; i <= 2**EMPTY_IN_W - vif.ast_empty_i; i++ )
+                begin
+                  data.push_back( vif.ast_data_i[i*8 +: 8] );
+                end
+
+              input_data.put(data);
+              return;
+            end
+          else if ( vif.ast_valid_o === 1'b1 && vif.ast_ready_i === 1'b1 )
+            begin
+              timeout = 0;
+
+              for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
+                begin
+                  data.push_back( vif.ast_data_i[i*8 +: 8] );
+                end
+            end
         end
 
-      do begin
-        @( posedge vif.clk );
-        if ( vif.ast_valid_o === 1'b1 && vif.ast_ready_i === 1'b1 )
-          begin
-            timeout = 0;
-            data.push_back( vif.ast_data_i );
-          end
-        else
-          timeout += 1;
-      end while ( vif.ast_endofpacket_o !== 1'b1 );
-
-      input_data.put(data);
     endtask
 
     task get_output_data;
@@ -246,24 +288,37 @@ package tb_env;
       symb_data_t data;
       data = {};
 
-      while ( vif.ast_startofpacket_i !== 1'b1 )
+      while ( ( vif.ast_startofpacket_o !== 1'b1 || vif.srst_i === 1'b1 ) &&
+                timeout++ < TIMEOUT )
+        @( posedge vif.clk );
+
+      while ( vif.srst_i !== 1'b1 && timeout++ < TIMEOUT )
         begin
           @( posedge vif.clk );
-          timeout += 1;
+
+          if ( vif.ast_endofpacket_o === 1'b1 )
+            begin
+              timeout = 0;
+
+              for ( int i = 0; i <= 2**EMPTY_OUT_W - vif.ast_empty_o; i++ )
+                begin
+                  data.push_back( vif.ast_data_o[i*8 +: 8] );
+                end
+
+              output_data.put(data);
+              return;
+            end
+          else if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 )
+            begin
+              timeout = 0;
+
+              for ( int i = 0; i < 2**EMPTY_OUT_W; i++ )
+                begin
+                  data.push_back( vif.ast_data_o[i*8 +: 8] );
+                end
+            end  
         end
 
-      do begin
-        @( posedge vif.clk );
-        if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 )
-          begin
-            timeout = 0;
-            data.push_back( vif.ast_data_o );
-          end
-        else 
-          timeout += 1;
-      end while ( vif.ast_endofpacket_o !== 1'b1 );
-
-      output_data.put(data);
     endtask
   
   endclass
@@ -284,8 +339,8 @@ package tb_env;
 
     task run;
 
-    symb_data_t in_data;
-    symb_data_t out_data;
+      symb_data_t in_data;
+      symb_data_t out_data;
 
       while ( input_data.num() )
         begin
@@ -293,7 +348,10 @@ package tb_env;
           output_data.get(out_data);
 
           if ( in_data.size() != out_data.size() )
-            $error("data sizes dont match!");
+            begin
+              $error("data sizes dont match!: wr size:%d, rd size:%d ",in_data.size(), out_data.size() );
+              $displayh("wr data:%p, rd data:%p", in_data, out_data );
+            end
           else
             begin
               while ( in_data.size() )
@@ -305,6 +363,7 @@ package tb_env;
         end
 
     endtask
+
   endclass
 
   class Environment;
@@ -336,13 +395,14 @@ package tb_env;
     
     task run;
     
-        generator.run();
-    
-        fork 
-          driver.run();
-          monitor.run();
-          scoreboard.run();
-        join
+      generator.run();
+  
+      fork 
+        driver.run();
+        monitor.run();
+      join
+
+      scoreboard.run();
         
     endtask
   
