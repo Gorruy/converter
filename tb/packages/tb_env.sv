@@ -3,7 +3,9 @@ package tb_env;
   import usr_types_and_params::*;
   
   class Transaction;
-  // Instance of this class will hold all info about single transaction
+  // Instance of this class will hold all info about single transaction in
+  // a form of queues, where each element in queue represents values of 
+  // dut signal during transaction
 
     in_data_t     data;
     int           len;
@@ -13,6 +15,7 @@ package tb_env;
     queued_bits_t ready;
     queued_bits_t startofpacket;
     queued_bits_t endofpacket;
+    bit           wait_dut_ready;
     
   endclass
   
@@ -31,8 +34,8 @@ package tb_env;
 
       Transaction tr;
 
-      // Transactions of max length with empty progression
-      for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
+      // Transactions of max length with random valid
+      repeat (NUMBER_OF_TEST_RUNS)
         begin
           tr     = new();
           tr.len = MAX_TR_LEN ;
@@ -44,13 +47,42 @@ package tb_env;
               tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
               tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
               tr.valid.push_back( $urandom_range( 1, 0 ) );
-              tr.ready.push_back( $urandom_range( 1, 0 ) );
+              tr.ready.push_back( 1'b1 );
               tr.startofpacket.push_back( 1'b0 );
               tr.endofpacket.push_back( 1'b0 );
             end
 
           tr.startofpacket[$] = 1'b1;
           tr.endofpacket[0]   = 1'b1;
+          tr.valid[$]         = 1'b1;
+          tr.valid[0]         = 1'b1;
+          tr.wait_dut_ready   = 1'b1;
+
+          generated_transactions.put(tr);
+        end
+
+
+      // Transactions of max length with empty's values progression
+      for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
+        begin
+          tr     = new();
+          tr.len = MAX_TR_LEN ;
+
+          repeat(MAX_TR_LEN)
+            begin
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+    
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+              tr.valid.push_back( 1'b1 );
+              tr.ready.push_back( 1'b1 );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
+            end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.wait_dut_ready   = 1'b1;
 
           generated_transactions.put(tr);
         end
@@ -68,6 +100,8 @@ package tb_env;
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b1 );
           tr.endofpacket.push_back( 1'b1 );
+
+          tr.wait_dut_ready = 1'b1;
 
           generated_transactions.put(tr);
         end
@@ -87,6 +121,10 @@ package tb_env;
           tr.endofpacket.push_back( 1'b0 );
         end
       tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.valid[$]         = 1'b1;
+      tr.valid[0]         = 1'b1;
+      tr.wait_dut_ready   = 1'b0;
 
       generated_transactions.put(tr);
 
@@ -105,7 +143,11 @@ package tb_env;
           tr.startofpacket.push_back( 0 );
           tr.endofpacket.push_back( $urandom_range( 1, 0 ) );
         end
-       tr.startofpacket[$] = 1'b1;
+      tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.valid[$]         = 1'b1;
+      tr.valid[0]         = 1'b1;
+      tr.wait_dut_ready   = 1'b0;
 
       generated_transactions.put(tr);
 
@@ -136,14 +178,11 @@ package tb_env;
       while ( generated_transactions.num() )
         begin
           generated_transactions.get(tr);
-          //tr.time_of_start = $time();
-          // $display(tr.message);
 
           write(tr);
-
         end
 
-      finish();
+      fin();
 
     endtask
 
@@ -154,7 +193,14 @@ package tb_env;
 
       repeat(tr.len)
         begin
+          while ( tr.wait_dut_ready && vif.ast_ready_o !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
+            begin
+              @( posedge vif.clk );
+            end
+
           @( posedge vif.clk );
+          wr_timeout               = 0;
+
           vif.ast_channel_i       <= tr.channel.pop_back();      
           vif.ast_empty_i         <= tr.empty.pop_back();        
           vif.ast_valid_i         <= tr.valid.pop_back();        
@@ -164,13 +210,13 @@ package tb_env;
           vif.ast_data_i          <= tr.data.pop_back();
         end
 
-      // This loop will finish transaction if endofpacket and ready_o doesn't met
-      while ( vif.ast_ready_o !== 1'b1 && wr_timeout++ < TIMEOUT )
+      // This loop will finish transaction if end of transaction and ready_o doesn't met
+      while ( vif.ast_ready_o !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
         @( posedge vif.clk );
 
     endtask
 
-    task finish;
+    task fin;
     // Transactions from write task doesnt imply completing of reading
     // This task will hold ready_i signal to finish transactions
 
@@ -182,7 +228,7 @@ package tb_env;
       vif.ast_ready_i = 1'b1;
       @( posedge vif.clk );
 
-      while ( vif.ast_valid_o === 1'b1 && finishing_timeout++ < TIMEOUT )
+      while ( vif.ast_valid_o === 1'b1 && finishing_timeout++ < DR_TIMEOUT )
         @( posedge vif.clk );
 
     endtask
@@ -243,7 +289,7 @@ package tb_env;
         begin
           @( posedge vif.clk );
 
-          if ( vif.ast_startofpacket_i === 1'b1 )
+          if ( vif.ast_startofpacket_i === 1'b1 && vif.ast_valid_i == 1'b1 && vif.ast_ready_o === 1'b1 )
             start_of_packet_flag = 1;
           if ( vif.srst_i === 1'b1 )
             begin
@@ -294,7 +340,7 @@ package tb_env;
         begin
           @( posedge vif.clk );
 
-          if ( vif.ast_startofpacket_i === 1'b1 )
+          if ( vif.ast_startofpacket_o === 1'b1 && vif.ast_valid_o == 1'b1 && vif.ast_ready_i === 1'b1 )
             start_of_packet_flag = 1;
           if ( vif.srst_i === 1'b1 )
             begin
