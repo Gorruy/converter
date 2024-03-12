@@ -3,8 +3,9 @@ module top_tb;
   import usr_types_and_params::*;
   import tb_env::Environment;
 
-  bit clk;
-  bit srst_done;
+  bit   clk;
+  logic srst;
+  bit   srst_done;
 
   initial forever #5 clk = !clk;
 
@@ -13,7 +14,8 @@ module top_tb;
     .EMPTY_W   ( EMPTY_IN_W ),
     .CHANNEL_W ( CHANNEL_W  ) 
   ) ast_if_in ( 
-    .clk(clk) 
+    .clk  ( clk  ),
+    .srst ( srst ) 
   );
 
   ast_interface #(
@@ -21,7 +23,8 @@ module top_tb;
     .EMPTY_W   ( EMPTY_OUT_W ),
     .CHANNEL_W ( CHANNEL_W   ) 
   ) ast_if_out ( 
-    .clk(clk) 
+    .clk  ( clk  ),
+    .srst ( srst ) 
   );
 
   ast_width_extender #(
@@ -30,7 +33,7 @@ module top_tb;
   .DATA_OUT_W          ( DATA_OUT_W                   )
   ) ast_inst (
   .clk_i               ( clk                          ),
-  .srst_i              ( ast_if_in.srst               ),
+  .srst_i              ( srst                         ),
 
   .ast_data_i          ( ast_if_in.ast_data           ),
   .ast_startofpacket_i ( ast_if_in.ast_startofpacket  ),
@@ -52,27 +55,22 @@ module top_tb;
 
   initial 
     begin
-      ast_if_in.srst <= 1'b0;
-      @( posedge ast_if_in.clk );
-      ast_if_in.srst <= 1'b1;
-      @( posedge ast_if_in.clk );
-      ast_if_in.srst <= 1'b0;
-      srst_done     <= 1'b1;
-    end 
+      @( posedge clk );
+      srst      <= 1'b0;
+      @( posedge clk );
+      srst      <= 1'b1;
+      @( posedge clk );
+      srst      <= 1'b0;
+      srst_done <= 1'b1;
+    end
 
   initial 
     begin
+
       Environment env;
       env = new( ast_if_in, ast_if_out );
-
-      wait(srst_done);
-      ast_if_in.ast_data          <= '0;         
-      ast_if_in.ast_startofpacket <= 1'b0;
-      ast_if_in.ast_endofpacket   <= 1'b0;  
-      ast_if_in.ast_valid         <= 1'b0;        
-      ast_if_in.ast_empty         <= '0;        
-      ast_if_in.ast_channel       <= '0;      
-      @( posedge ast_if_in.clk );
+   
+      wait( srst_done );
 
       env.run();
 

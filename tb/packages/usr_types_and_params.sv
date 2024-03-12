@@ -9,7 +9,7 @@ package usr_types_and_params;
   parameter NUMBER_OF_TEST_RUNS       = 10;
   parameter MAX_DELAY                 = 10;
   parameter MIN_DELAY                 = 0;
-  parameter MAX_TR_LEN                = 5;
+  parameter MAX_TR_LEN                = 10;
   parameter TIMEOUT                   = MAX_TR_LEN * MAX_DELAY * 3;
   parameter DR_TIMEOUT                = MAX_TR_LEN * MAX_DELAY;
   parameter MAX_DATA_VALUE            = 2**DATA_IN_W - 1;

@@ -82,26 +82,8 @@ package tb_env;
 
           tr.startofpacket[$] = 1'b1;
           tr.endofpacket[0]   = 1'b1;
+          tr.ready[0]         = 1'b1;
           tr.wait_dut_ready   = 1'b1;
-
-          generated_transactions.put(tr);
-        end
-
-      // Trancastions of length one
-      repeat ( NUMBER_OF_ONE_LENGHT_RUNS )
-        begin
-          tr     = new();
-          tr.len = 1;
-
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b1 );
-          tr.endofpacket.push_back( 1'b1 );
-
-          tr.wait_dut_ready = 1'b1;
 
           generated_transactions.put(tr);
         end
@@ -124,6 +106,7 @@ package tb_env;
       tr.endofpacket[0]   = 1'b1;
       tr.valid[$]         = 1'b1;
       tr.valid[0]         = 1'b1;
+      tr.ready[0]         = 1'b1;
       tr.wait_dut_ready   = 1'b0;
 
       generated_transactions.put(tr);
@@ -147,6 +130,7 @@ package tb_env;
       tr.endofpacket[0]   = 1'b1;
       tr.valid[$]         = 1'b1;
       tr.valid[0]         = 1'b1;
+      tr.ready[0]         = 1'b1;
       tr.wait_dut_ready   = 1'b0;
 
       generated_transactions.put(tr);
@@ -178,6 +162,25 @@ package tb_env;
           generated_transactions.put(tr);
         end
 
+      // Trancastions of length one
+      repeat ( NUMBER_OF_ONE_LENGHT_RUNS )
+        begin
+          tr     = new();
+          tr.len = 1;
+
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b1 );
+          tr.endofpacket.push_back( 1'b1 );
+
+          tr.wait_dut_ready = 1'b1;
+
+          generated_transactions.put(tr);
+        end
+
     endtask 
     
   endclass
@@ -186,12 +189,12 @@ package tb_env;
   // This class will drive all dut input signals
   // according to transaction's parameters
 
-    virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) i_vif;
-    virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) o_vif;
+    virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) i_vif;
+    virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) o_vif;
     mailbox #( Transaction ) generated_transactions;
 
-    function new( input virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) i_dut_interface,
-                  input virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) o_dut_interface,
+    function new( input virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) i_dut_interface,
+                  input virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) o_dut_interface,
                   mailbox #( Transaction )    gen_tr 
                 );
 
@@ -246,6 +249,18 @@ package tb_env;
 
     endtask
 
+    task init;
+
+      i_vif.ast_channel       <= '0;
+      i_vif.ast_empty         <= '0;
+      i_vif.ast_valid         <= '0;
+      o_vif.ast_ready         <= '0;
+      i_vif.ast_startofpacket <= '0;
+      i_vif.ast_endofpacket   <= '0;
+      i_vif.ast_data          <= '0;
+
+    endtask
+
     task fin;
     // Transactions from write task doesnt imply completing of reading
     // This task will hold ready_i signal to finish transactions
@@ -255,19 +270,22 @@ package tb_env;
       finishing_timeout = 0;
 
       @( posedge i_vif.clk );
-      o_vif.ast_ready = 1'b1;
+      o_vif.ast_ready <= 1'b1;
       @( posedge i_vif.clk );
 
-      while ( o_vif.ast_valid === 1'b1 && finishing_timeout++ < DR_TIMEOUT )
-        @( posedge i_vif.clk );
+      while ( i_vif.ast_valid === 1'b1 && finishing_timeout++ < DR_TIMEOUT )
+        begin
+          @( posedge i_vif.clk );
+        end
 
-    endtask
+      i_vif.ast_channel       <= '0;
+      i_vif.ast_empty         <= '0;
+      i_vif.ast_valid         <= 1'b0;
+      o_vif.ast_ready         <= 1'b0;
+      i_vif.ast_startofpacket <= 1'b0;
+      i_vif.ast_endofpacket   <= 1'b0;
+      i_vif.ast_data          <= '0;
 
-    task reset;
-      @( posedge i_vif.clk );
-      i_vif.srst <= 1'b1;
-      @( posedge i_vif.clk );
-      i_vif.srst <= 1'b0;
     endtask
   
   endclass
@@ -276,13 +294,12 @@ package tb_env;
   // This class will gather both input and output data from dut
   // and send it to Scoreboard
 
-    virtual ast_interface #(.DATA_W(DATA_W), .EMPTY_W(EMPTY_W), .CHANNEL_W(CHANNEL_W)) vif;
-
-    mailbox #( symb_data_t ) input_data;
+     virtual ast_interface #( DATA_W, EMPTY_W, CHANNEL_W ) vif;
+     mailbox #( symb_data_t ) input_data;
 
     int                      timeout_ctr;
 
-    function new ( input virtual ast_interface #(.DATA_W(DATA_W), .EMPTY_W(EMPTY_W), .CHANNEL_W(CHANNEL_W)) dut_interface,
+    function new ( input virtual ast_interface #( DATA_W, EMPTY_W, CHANNEL_W ) dut_interface,
                    mailbox #( symb_data_t )    mbx_data
                  );
 
@@ -294,8 +311,7 @@ package tb_env;
 
     task run;
 
-      while ( timeout_ctr < TIMEOUT )
-        get_data();
+      get_data();
 
     endtask
 
@@ -315,7 +331,9 @@ package tb_env;
             start_of_packet_flag = 1;
           if ( vif.srst === 1'b1 )
             begin
-              timeout_ctr = 0;
+              timeout_ctr          = 0;
+              start_of_packet_flag = 0;
+              data                 = {}; 
               continue;
             end
             
@@ -326,19 +344,22 @@ package tb_env;
                 begin
                   timeout_ctr = 0;
 
-                  for ( int i = 0; i < 2**EMPTY_IN_W - vif.ast_empty; i++ )
+                  for ( int i = 0; i < 2**EMPTY_W - vif.ast_empty; i++ )
                     begin
+                      $display(2**EMPTY_W);
                       data.push_back( vif.ast_data[i*8 +: 8] );
                     end
 
                   input_data.put(data);
-                  return;
+                  start_of_packet_flag = 0;
+                  data                 = {}; 
+                  continue;
                 end
               else
                 begin
                   timeout_ctr = 0;
 
-                  for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
+                  for ( int i = 0; i < 2**EMPTY_W; i++ )
                     begin
                       data.push_back( vif.ast_data[i*8 +: 8] );
                     end
@@ -380,7 +401,7 @@ package tb_env;
 
           if ( in_data.size() != out_data.size() )
             begin
-              $error( "data sizes dont match!: wr size:%d, rd size:%d ",in_data.size(), out_data.size() );
+              $error( "data sizes dont match!: wr size:%d, rd size:%d ", in_data.size(), out_data.size() );
               $displayh( "wr data:%p", in_data );
               $displayh( "rd data:%p", out_data );
             end
@@ -407,21 +428,21 @@ package tb_env;
   class Environment;
   // This class will hold all tb elements together
     
-    Driver                                                  driver;
-    Monitor #( .DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W) )   in_monitor;
-    Monitor #( .DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W) ) out_monitor;
-    Scoreboard                                              scoreboard;
-    Generator                                               generator;
+    Driver                               driver;
+    Monitor #( DATA_IN_W, EMPTY_IN_W )   in_monitor;
+    Monitor #( DATA_OUT_W, EMPTY_OUT_W ) out_monitor;
+    Scoreboard                           scoreboard;
+    Generator                            generator;
 
     mailbox #( Transaction ) generated_transactions;
     mailbox #( symb_data_t ) input_data;
     mailbox #( symb_data_t ) output_data;
 
-    virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) i_vif;
-    virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) o_vif;
+    virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) i_vif;
+    virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) o_vif;
 
-    function new( input virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) in_dut_interface,
-                  input virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) out_dut_interface
+    function new( input virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) in_dut_interface,
+                  input virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) out_dut_interface
                 );
 
       generated_transactions = new();
@@ -441,6 +462,8 @@ package tb_env;
     task run;
     
       generator.run();
+
+      driver.init();
   
       @( posedge i_vif.clk );
       fork 

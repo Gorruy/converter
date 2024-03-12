@@ -3,10 +3,10 @@ interface ast_interface #(
   parameter EMPTY_W   = 1,
   parameter CHANNEL_W = 1
  ) ( 
-  input bit clk 
+  input bit   clk,
+  input logic srst
 );
 
-  logic                 srst;
   logic [DATA_W-1:0]    ast_data;
   logic                 ast_startofpacket;
   logic                 ast_endofpacket;
