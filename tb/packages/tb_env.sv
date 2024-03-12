@@ -293,14 +293,11 @@ package tb_env;
     endfunction
 
     task run;
-
-      while ( timeout_ctr < TIMEOUT )
-        begin
-          fork
-            get_input_data();
-            get_output_data();
-          join
-        end
+      
+      fork
+        get_input_data();
+        get_output_data();
+      join
 
     endtask
 
@@ -337,7 +334,9 @@ package tb_env;
                     end
 
                   input_data.put(data);
-                  return;
+                  start_of_packet_flag = 0;
+                  data                 = {}; 
+                  continue;
                 end
               else
                 begin
@@ -361,7 +360,6 @@ package tb_env;
 
       start_of_packet_flag = 0;
       data                 = {};
-
 
       while ( timeout_ctr++ < TIMEOUT )
         begin
@@ -388,7 +386,9 @@ package tb_env;
                     end
 
                   output_data.put(data);
-                  return;
+                  start_of_packet_flag = 0;
+                  data                 = {};
+                  continue;
                 end
               else
                 begin
