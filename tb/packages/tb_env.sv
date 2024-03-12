@@ -151,6 +151,33 @@ package tb_env;
 
       generated_transactions.put(tr);
 
+      // Transactions of max length with random ready
+      repeat (NUMBER_OF_TEST_RUNS)
+        begin
+          tr     = new();
+          tr.len = MAX_TR_LEN ;
+
+          repeat(MAX_TR_LEN)
+            begin
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+    
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+              tr.valid.push_back( 1'b1 );
+              tr.ready.push_back( $urandom_range( 1, 0 ) );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
+            end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.valid[$]         = 1'b1;
+          tr.valid[0]         = 1'b1;
+          tr.wait_dut_ready   = 1'b0;
+
+          generated_transactions.put(tr);
+        end
+
     endtask 
     
   endclass
