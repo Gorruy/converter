@@ -2,8 +2,12 @@
 
 1. Модуль не отвечает на послыку пакета единичной длины и не поднимает сигнал ast_endofpacket_o
 
-`Error: There is no startofpacket_o after endofpacket_i!!!
-Time: 665 ps  Scope: tb_env.Driver.read File: packages/tb_env.sv Line: 211`
+`Error: data sizes dont match!: wr size:          4, rd size:         18
+Time: 2895 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 439`
+
+`wr data:'{5e, 46, e1, 32}`
+
+`rd data:'{69, 66, 8f, a5, 00, 00, 00, 00, 1a, 7b, c2, 76, 00, 00, 00, 00, 4d, 4f}`
 
 2. Модуль завершил выходную транзакции с ast_empty_o = 15, неправильно расчитав: правильным было бы значение 0, и выдал неверные данные из-за этого:
 
