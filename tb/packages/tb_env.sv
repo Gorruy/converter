@@ -34,6 +34,69 @@ package tb_env;
 
       Transaction tr;
 
+      // Normal transaction
+      tr     = new();
+      tr.len = MAX_TR_LEN ;
+
+      repeat(MAX_TR_LEN)
+        begin
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b0 );
+          tr.endofpacket.push_back( 1'b0 );
+        end
+
+      tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.wait_dut_ready   = 1'b1;
+
+      generated_transactions.put(tr);
+
+      // Trancastions of length one
+      repeat ( NUMBER_OF_ONE_LENGHT_RUNS )
+        begin
+          tr     = new();
+          tr.len = 1;
+
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b1 );
+          tr.endofpacket.push_back( 1'b1 );
+
+          tr.wait_dut_ready = 1'b1;
+
+          generated_transactions.put(tr);
+        end
+
+      // Transaction without valid
+      tr     = new();
+      tr.len = MAX_TR_LEN ;
+
+      repeat(MAX_TR_LEN)
+        begin
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.valid.push_back( 1'b0 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b0 );
+          tr.endofpacket.push_back( 1'b0 );
+        end
+
+      tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.wait_dut_ready   = 1'b1;
+
+      generated_transactions.put(tr);
+
       // Transactions of max length with random valid
       repeat (NUMBER_OF_TEST_RUNS)
         begin
@@ -162,30 +225,11 @@ package tb_env;
           generated_transactions.put(tr);
         end
 
-      // Trancastions of length one
-      repeat ( NUMBER_OF_ONE_LENGHT_RUNS )
-        begin
-          tr     = new();
-          tr.len = 1;
-
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b1 );
-          tr.endofpacket.push_back( 1'b1 );
-
-          tr.wait_dut_ready = 1'b1;
-
-          generated_transactions.put(tr);
-        end
-
     endtask 
     
   endclass
 
-  class Driver;
+  class Driver #( DATA_W = 1, EMPTY_W = 1 );
   // This class will drive all dut input signals
   // according to transaction's parameters
 
@@ -204,9 +248,7 @@ package tb_env;
 
     endfunction
 
-    task run;
-
-      Transaction tr;
+    task run( input Trancastion tr );
 
       while ( generated_transactions.num() )
         begin
@@ -339,14 +381,13 @@ package tb_env;
             
           if ( vif.ast_valid === 1'b1 && vif.ast_ready === 1'b1 && start_of_packet_flag )
             begin
-              // Transaction without errors can be finished only with endofpacket raised
+              // Transaction without errors can be finished only when endofpacket raised
               if ( vif.ast_endofpacket === 1'b1 )
                 begin
                   timeout_ctr = 0;
 
                   for ( int i = 0; i < 2**EMPTY_W - vif.ast_empty; i++ )
                     begin
-                      $display(2**EMPTY_W);
                       data.push_back( vif.ast_data[i*8 +: 8] );
                     end
 
@@ -428,7 +469,7 @@ package tb_env;
   class Environment;
   // This class will hold all tb elements together
     
-    Driver                               driver;
+    Driver #( DATA_IN_W, EMPTY_IN_W )    driver;
     Monitor #( DATA_IN_W, EMPTY_IN_W )   in_monitor;
     Monitor #( DATA_OUT_W, EMPTY_OUT_W ) out_monitor;
     Scoreboard                           scoreboard;

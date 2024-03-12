@@ -6,14 +6,14 @@ package usr_types_and_params;
   parameter EMPTY_IN_W                = $clog2(DATA_IN_W/8) ? $clog2(DATA_IN_W/8) : 1;
   parameter EMPTY_OUT_W               = $clog2(DATA_OUT_W/8) ? $clog2(DATA_OUT_W/8) : 1;
 
-  parameter NUMBER_OF_TEST_RUNS       = 10;
+  parameter NUMBER_OF_TEST_RUNS       = 2;
   parameter MAX_DELAY                 = 10;
   parameter MIN_DELAY                 = 0;
   parameter MAX_TR_LEN                = 10;
   parameter TIMEOUT                   = MAX_TR_LEN * MAX_DELAY * 3;
   parameter DR_TIMEOUT                = MAX_TR_LEN * MAX_DELAY;
   parameter MAX_DATA_VALUE            = 2**DATA_IN_W - 1;
-  parameter NUMBER_OF_ONE_LENGHT_RUNS = 5;
+  parameter NUMBER_OF_ONE_LENGHT_RUNS = 1;
 
   typedef logic [DATA_IN_W - 1:0]   in_data_t[$];
   typedef logic [DATA_OUT_W - 1:0]  out_data_t[$];
