@@ -3,17 +3,19 @@ package tb_env;
   import usr_types_and_params::*;
   
   class Transaction;
-  // Instance of this class will hold all info about single transaction
+  // Instance of this class will hold all info about single transaction in
+  // a form of queues, where each element in queue represents values of 
+  // dut signal during transaction
 
-    in_data_t   in_data;
-    int         len;
-    delays_t    ready_i_delays;
-    delays_t    valid_i_delays;
-    channel_t   channel;
-    string      message;
-    int         time_of_start;
-    empty_in_t  empty_in;
-    bit         set_startofpacket_low;
+    in_data_t     data;
+    int           len;
+    channel_t     channel[$];
+    empty_in_t    empty[$];
+    queued_bits_t valid;
+    queued_bits_t ready;
+    queued_bits_t startofpacket;
+    queued_bits_t endofpacket;
+    bit           wait_dut_ready;
     
   endclass
   
@@ -32,92 +34,146 @@ package tb_env;
 
       Transaction tr;
 
-      // generates configurations with ones or witout any delays without empty symbols
-      for ( int wr_delay = 0; wr_delay <= 1; wr_delay++ )
+      // Transactions of max length with random valid
+      repeat (NUMBER_OF_TEST_RUNS)
         begin
-          for ( int rd_delay = 0; rd_delay <= 1; rd_delay++ )
+          tr     = new();
+          tr.len = MAX_TR_LEN ;
+
+          repeat(MAX_TR_LEN)
             begin
-              tr          = new();
-              tr.len      = MAX_TR_LEN;
-              tr.channel  = '0;
-              tr.empty_in = '0;
-              repeat(tr.len)
-                begin
-                  tr.valid_i_delays.push_back(wr_delay);
-                  tr.ready_i_delays.push_back(rd_delay);
-                  tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-                end
-              
-              tr.message = { wr_delay == 0 ? "Write without delay and ": "Writing with delay of one clk cycle ",
-                             rd_delay == 0 ? "read without delay": "reading with delay of one clk cycle"  };
-              generated_transactions.put(tr);
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+    
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+              tr.valid.push_back( $urandom_range( 1, 0 ) );
+              tr.ready.push_back( 1'b1 );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
             end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.valid[$]         = 1'b1;
+          tr.valid[0]         = 1'b1;
+          tr.wait_dut_ready   = 1'b1;
+
+          generated_transactions.put(tr);
         end
 
-      // Transaction of max length with random channel and empty info without delays
-      tr          = new();
-      tr.message  = "Transactions with empty symbols";
-      tr.len      = MAX_TR_LEN;
-      tr.channel  = $urandom_range( 2**CHANNEL_W, 1 );
-      tr.empty_in = $urandom_range( 2**EMPTY_IN_W, 1 );
-      repeat(tr.len)
+
+      // Transactions of max length with empty's values progression
+      for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
         begin
-          tr.valid_i_delays.push_back(0);
-          tr.ready_i_delays.push_back(0);
-          tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+          tr     = new();
+          tr.len = MAX_TR_LEN ;
+
+          repeat(MAX_TR_LEN)
+            begin
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+    
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+              tr.valid.push_back( 1'b1 );
+              tr.ready.push_back( 1'b1 );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
+            end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.wait_dut_ready   = 1'b1;
+
+          generated_transactions.put(tr);
         end
+
+      // Trancastions of length one
+      repeat ( NUMBER_OF_ONE_LENGHT_RUNS )
+        begin
+          tr     = new();
+          tr.len = 1;
+
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b1 );
+          tr.endofpacket.push_back( 1'b1 );
+
+          tr.wait_dut_ready = 1'b1;
+
+          generated_transactions.put(tr);
+        end
+
+      // Transaction with random values of startofpacket 
+      tr     = new();
+      tr.len = MAX_TR_LEN;
+
+      repeat(MAX_TR_LEN)
+        begin
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.valid.push_back( $urandom_range( 1, 0 ) );
+          tr.ready.push_back( $urandom_range( 1, 0 ) );
+          tr.startofpacket.push_back( $urandom_range( 1, 0 ) );
+          tr.endofpacket.push_back( 1'b0 );
+        end
+      tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.valid[$]         = 1'b1;
+      tr.valid[0]         = 1'b1;
+      tr.wait_dut_ready   = 1'b0;
 
       generated_transactions.put(tr);
 
-      // Many transactions of length one
-      tr         = new();
-      tr.message = "Transactions of length one started";
-      repeat (NUMBER_OF_ONE_LENGHT_RUNS)
+      // Transaction with random values of endofpacket 
+      tr     = new();
+      tr.len = MAX_TR_LEN;
+
+      repeat(MAX_TR_LEN)
         begin
-          tr.len      = 1;
-          tr.channel  = $urandom_range( 2**CHANNEL_W, 0 );
-          tr.empty_in = '0;
-          tr.ready_i_delays.push_back(0);
-          tr.valid_i_delays.push_back(0);
-          tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          generated_transactions.put(tr);
-          tr         = new();
-          tr.message = "another one length transaction";
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+    
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.valid.push_back( $urandom_range( 1, 0 ) );
+          tr.ready.push_back( $urandom_range( 1, 0 ) );
+          tr.startofpacket.push_back( 0 );
+          tr.endofpacket.push_back( $urandom_range( 1, 0 ) );
         end
+      tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.valid[$]         = 1'b1;
+      tr.valid[0]         = 1'b1;
+      tr.wait_dut_ready   = 1'b0;
 
-      // Transactions of max length with progressions of empty
-      for ( int i = 0; i < 2**EMPTY_OUT_W; i++ )
-        begin
-          tr          = new();
-          tr.message  = "Transactions with empty symbols";
-          tr.len      = MAX_TR_LEN;
-          tr.channel  = $urandom_range( 2**CHANNEL_W, 1 );
-          tr.empty_in = i;
-          repeat(tr.len)
-            begin
-              tr.valid_i_delays.push_back(0);
-              tr.ready_i_delays.push_back(0);
-              tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-            end
+      generated_transactions.put(tr);
 
-          generated_transactions.put(tr);
-        end
-
-      // Random transactions without empty symbols
+      // Transactions of max length with random ready
       repeat (NUMBER_OF_TEST_RUNS)
         begin
-          tr          = new();
-          tr.message  = "Transaction with random parameters";
-          tr.len      = $urandom_range( MAX_TR_LEN, 2 );
-          tr.channel  = $urandom_range( 2**CHANNEL_W - 1, 0 );
-          tr.empty_in = '0;
-          repeat(tr.len)
+          tr     = new();
+          tr.len = MAX_TR_LEN ;
+
+          repeat(MAX_TR_LEN)
             begin
-              tr.ready_i_delays.push_back( $urandom_range( MAX_DELAY, MIN_DELAY ) );
-              tr.valid_i_delays.push_back( $urandom_range( MAX_DELAY, MIN_DELAY ) );
-              tr.in_data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+    
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+              tr.valid.push_back( 1'b1 );
+              tr.ready.push_back( $urandom_range( 1, 0 ) );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
             end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.valid[$]         = 1'b1;
+          tr.valid[0]         = 1'b1;
+          tr.wait_dut_ready   = 1'b0;
 
           generated_transactions.put(tr);
         end
@@ -149,109 +205,58 @@ package tb_env;
       while ( generated_transactions.num() )
         begin
           generated_transactions.get(tr);
-          //tr.time_of_start = $time();
-          // $display(tr.message);
 
-          fork
-            write(tr);
-            read(tr);
-          join
-
-          // case with many tr of one length should be ran without resets
-          if ( tr.len != 1 )
-            reset();
-
+          write(tr);
         end
+
+      fin();
 
     endtask
 
     task write ( input Transaction tr );
 
-      repeat( tr.valid_i_delays.pop_back() )
+      int wr_timeout;
+      wr_timeout = 0;
+
+      repeat(tr.len)
         begin
-          @( posedge vif.clk );
-        end
-
-      vif.ast_data_i          <= tr.in_data.pop_back();
-      vif.ast_startofpacket_i <= 1'b1;
-      vif.ast_valid_i         <= 1'b1;
-      vif.ast_channel_i       <= tr.channel;
-
-      while ( tr.in_data.size() > 0 )
-        begin
-          @( posedge vif.clk );
-          vif.ast_startofpacket_i <= 1'b0;
-
-          if ( vif.ast_ready_o !== 1'b1 )
-            continue;
-          else
+          while ( tr.wait_dut_ready && vif.ast_ready_o !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
             begin
-              repeat( tr.valid_i_delays.pop_back() )
-                begin
-                  vif.ast_valid_i <= 1'b0;
-                  @( posedge vif.clk );
-                end
-              vif.ast_data_i  <= tr.in_data.pop_back();
-              vif.ast_valid_i <= 1'b1;
+              @( posedge vif.clk );
             end
+
+          @( posedge vif.clk );
+          wr_timeout               = 0;
+
+          vif.ast_channel_i       <= tr.channel.pop_back();      
+          vif.ast_empty_i         <= tr.empty.pop_back();        
+          vif.ast_valid_i         <= tr.valid.pop_back();        
+          vif.ast_ready_i         <= tr.ready.pop_back();        
+          vif.ast_startofpacket_i <= tr.startofpacket.pop_back();
+          vif.ast_endofpacket_i   <= tr.endofpacket.pop_back();  
+          vif.ast_data_i          <= tr.data.pop_back();
         end
-      
-      vif.ast_endofpacket_i   <= 1'b1;
-      vif.ast_empty_i         <= tr.empty_in;
-      @( posedge vif.clk );
-      vif.ast_endofpacket_i   <= 1'b0;
-      vif.ast_valid_i         <= 1'b0;
-      vif.ast_startofpacket_i <= 1'b0;
+
+      // This loop will finish transaction if end of transaction and ready_o doesn't met
+      while ( vif.ast_ready_o !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
+        @( posedge vif.clk );
 
     endtask
 
-    task read ( input Transaction tr );
-    // Task to set ready_i delays and check for timeout_ctrs
+    task fin;
+    // Transactions from write task doesnt imply completing of reading
+    // This task will hold ready_i signal to finish transactions
 
-      int start_of_packet_flag;
-      int read_timeout_ctr;
+      int finishing_timeout;
 
-      read_timeout_ctr         = 0;
-      start_of_packet_flag = 0;
-      
-      vif.ast_ready_i <= 1'b1;
+      finishing_timeout = 0;
 
-      while (1)
-        begin
-          @( posedge vif.clk );
-          if ( vif.ast_startofpacket_i === 1'b1 )
-            begin
-              read_timeout_ctr = 0;
-            end
+      @( posedge vif.clk );
+      vif.ast_ready_i = 1'b1;
+      @( posedge vif.clk );
 
-          if ( read_timeout_ctr == READ_TIMEOUT )
-            begin
-              $error("There is no startofpacket_o after startofpacket_i!!!");
-              return;
-            end
-          if ( vif.ast_startofpacket_o === 1'b1 )
-            begin
-              read_timeout_ctr         = 0;
-              start_of_packet_flag = 1;
-            end
-          else
-            read_timeout_ctr += 1;
-
-          if ( vif.ast_valid_o === 1'b1 && start_of_packet_flag )
-            begin
-              vif.ast_ready_i     <= 1'b0;
-              start_of_packet_flag = 0;
-              repeat(tr.ready_i_delays.pop_back())
-                begin
-                  @( posedge vif.clk );
-                end
-              vif.ast_ready_i <= 1'b1;
-            end
-
-          if ( vif.ast_endofpacket_o === 1'b1 )
-            return;
-
-        end
+      while ( vif.ast_valid_o === 1'b1 && finishing_timeout++ < DR_TIMEOUT )
+        @( posedge vif.clk );
 
     endtask
 
@@ -311,7 +316,7 @@ package tb_env;
         begin
           @( posedge vif.clk );
 
-          if ( vif.ast_startofpacket_i === 1'b1 )
+          if ( vif.ast_startofpacket_i === 1'b1 && vif.ast_valid_i == 1'b1 && vif.ast_ready_o === 1'b1 )
             start_of_packet_flag = 1;
           if ( vif.srst_i === 1'b1 )
             begin
@@ -362,7 +367,7 @@ package tb_env;
         begin
           @( posedge vif.clk );
 
-          if ( vif.ast_startofpacket_i === 1'b1 )
+          if ( vif.ast_startofpacket_o === 1'b1 && vif.ast_valid_o == 1'b1 && vif.ast_ready_i === 1'b1 )
             start_of_packet_flag = 1;
           if ( vif.srst_i === 1'b1 )
             begin
@@ -422,7 +427,7 @@ package tb_env;
       symb_data_t out_data;
 
       if ( input_data.num() !== output_data.num() )
-        $error("Number of read and written transactions doesn't equal, wr:%d, rd:%d", input_data.num(), output_data.num() );
+        $error( "Number of read and written transactions doesn't equal, wr:%d, rd:%d", input_data.num(), output_data.num() );
 
       while ( input_data.num() && output_data.num() )
         begin
@@ -431,9 +436,9 @@ package tb_env;
 
           if ( in_data.size() != out_data.size() )
             begin
-              $error("data sizes dont match!: wr size:%d, rd size:%d ",in_data.size(), out_data.size() );
-              $displayh("wr data:%p", in_data );
-              $displayh("rd data:%p", out_data );
+              $error( "data sizes dont match!: wr size:%d, rd size:%d ",in_data.size(), out_data.size() );
+              $displayh( "wr data:%p", in_data );
+              $displayh( "rd data:%p", out_data );
             end
           else
             begin
@@ -441,10 +446,10 @@ package tb_env;
                 begin
                   if ( in_data[i] != out_data[i] )
                     begin
-                      $error("wrong data!");
-                      $displayh("wr data:%p", in_data );
-                      $displayh("rd data:%p", out_data );
-                      $display("Index: %d", i );
+                      $error( "wrong data!" );
+                      $displayh( "wr data:%p", in_data );
+                      $displayh( "rd data:%p", out_data );
+                      $display( "Index: %d", i );
                       break;
                     end
                 end
@@ -471,9 +476,9 @@ package tb_env;
 
     function new( input virtual ast_interface dut_interface );
 
-      generated_transactions = new;
-      input_data             = new;
-      output_data            = new;
+      generated_transactions = new();
+      input_data             = new();
+      output_data            = new();
 
       vif                    = dut_interface;
       driver                 = new( vif, generated_transactions );

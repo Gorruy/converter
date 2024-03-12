@@ -11,7 +11,7 @@ package usr_types_and_params;
   parameter MIN_DELAY                 = 0;
   parameter MAX_TR_LEN                = 5;
   parameter TIMEOUT                   = MAX_TR_LEN * MAX_DELAY * 3;
-  parameter READ_TIMEOUT              = MAX_TR_LEN * MAX_DELAY;
+  parameter DR_TIMEOUT                = MAX_TR_LEN * MAX_DELAY;
   parameter MAX_DATA_VALUE            = 2**DATA_IN_W - 1;
   parameter NUMBER_OF_ONE_LENGHT_RUNS = 5;
 
@@ -22,5 +22,7 @@ package usr_types_and_params;
   typedef logic [EMPTY_IN_W - 1:0]  empty_in_t;
   typedef logic [EMPTY_OUT_W - 1:0] empty_out_t;
   typedef logic [7:0]               symb_data_t[$];
+  
+  typedef bit                       queued_bits_t[$];
 
 endpackage

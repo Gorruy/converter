@@ -5,11 +5,11 @@
 `Error: There is no startofpacket_o after endofpacket_i!!!
 Time: 665 ps  Scope: tb_env.Driver.read File: packages/tb_env.sv Line: 211`
 
-2. Модуль завершил выходную транзакции с ast_empty_o = 15, и выдал неверные данные из-за этого:
+2. Модуль завершил выходную транзакции с ast_empty_o = 15, неправильно расчитав: правильным было бы значение 0, и выдал неверные данные из-за этого:
 
-`Error: data sizes dont match!: wr size:         16, rd size:          1
-Time: 9225 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 435`
+`Error: data sizes dont match!: wr size:         32, rd size:         17
+Time: 4105 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 400`
 
-`wr data:'{fe, 96, ab, ad, 00, 00, 00, 00, a9, 37, 39, a2, 00, 00, 00, 00}`
+`wr data:'{23, 76, a5, aa, 00, 00, 00, 00, 41, 44, 7e, e2, 00, 00, 00, 00, b6, 6d, ca, 5e, 00, 00, 00, 00, 72, 07, 3d, 8d, 00, 00, 00, 00}`
 
-`rd data:'{fe}`
+`rd data:'{23, 76, a5, aa, 00, 00, 00, 00, 41, 44, 7e, e2, 00, 00, 00, 00, b6}`
