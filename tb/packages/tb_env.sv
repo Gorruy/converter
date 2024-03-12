@@ -186,14 +186,17 @@ package tb_env;
   // This class will drive all dut input signals
   // according to transaction's parameters
 
-    virtual ast_interface    vif;
+    virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) i_vif;
+    virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) o_vif;
     mailbox #( Transaction ) generated_transactions;
 
-    function new( input virtual ast_interface dut_interface,
+    function new( input virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) i_dut_interface,
+                  input virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) o_dut_interface,
                   mailbox #( Transaction )    gen_tr 
                 );
 
-      vif                    = dut_interface;
+      i_vif                  = i_dut_interface;
+      o_vif                  = o_dut_interface;
       generated_transactions = gen_tr;
 
     endfunction
@@ -220,26 +223,26 @@ package tb_env;
 
       repeat(tr.len)
         begin
-          while ( tr.wait_dut_ready && vif.ast_ready_o !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
+          while ( tr.wait_dut_ready && i_vif.ast_ready !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
             begin
-              @( posedge vif.clk );
+              @( posedge i_vif.clk );
             end
 
-          @( posedge vif.clk );
+          @( posedge i_vif.clk );
           wr_timeout               = 0;
 
-          vif.ast_channel_i       <= tr.channel.pop_back();      
-          vif.ast_empty_i         <= tr.empty.pop_back();        
-          vif.ast_valid_i         <= tr.valid.pop_back();        
-          vif.ast_ready_i         <= tr.ready.pop_back();        
-          vif.ast_startofpacket_i <= tr.startofpacket.pop_back();
-          vif.ast_endofpacket_i   <= tr.endofpacket.pop_back();  
-          vif.ast_data_i          <= tr.data.pop_back();
+          i_vif.ast_channel       <= tr.channel.pop_back();      
+          i_vif.ast_empty         <= tr.empty.pop_back();        
+          i_vif.ast_valid         <= tr.valid.pop_back();        
+          o_vif.ast_ready         <= tr.ready.pop_back();        
+          i_vif.ast_startofpacket <= tr.startofpacket.pop_back();
+          i_vif.ast_endofpacket   <= tr.endofpacket.pop_back();  
+          i_vif.ast_data          <= tr.data.pop_back();
         end
 
       // This loop will finish transaction if end of transaction and ready_o doesn't met
-      while ( vif.ast_ready_o !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
-        @( posedge vif.clk );
+      while ( i_vif.ast_ready !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
+        @( posedge i_vif.clk );
 
     endtask
 
@@ -251,43 +254,40 @@ package tb_env;
 
       finishing_timeout = 0;
 
-      @( posedge vif.clk );
-      vif.ast_ready_i = 1'b1;
-      @( posedge vif.clk );
+      @( posedge i_vif.clk );
+      o_vif.ast_ready = 1'b1;
+      @( posedge i_vif.clk );
 
-      while ( vif.ast_valid_o === 1'b1 && finishing_timeout++ < DR_TIMEOUT )
-        @( posedge vif.clk );
+      while ( o_vif.ast_valid === 1'b1 && finishing_timeout++ < DR_TIMEOUT )
+        @( posedge i_vif.clk );
 
     endtask
 
     task reset;
-      @( posedge vif.clk );
-      vif.srst_i <= 1'b1;
-      @( posedge vif.clk );
-      vif.srst_i <= 1'b0;
+      @( posedge i_vif.clk );
+      i_vif.srst <= 1'b1;
+      @( posedge i_vif.clk );
+      i_vif.srst <= 1'b0;
     endtask
   
   endclass
   
-  class Monitor;
+  class Monitor #( DATA_W = 1, EMPTY_W = 1 );
   // This class will gather both input and output data from dut
   // and send it to Scoreboard
 
-    virtual ast_interface    vif;
+    virtual ast_interface #(.DATA_W(DATA_W), .EMPTY_W(EMPTY_W), .CHANNEL_W(CHANNEL_W)) vif;
 
     mailbox #( symb_data_t ) input_data;
-    mailbox #( symb_data_t ) output_data;
 
     int                      timeout_ctr;
 
-    function new ( input virtual ast_interface dut_interface,
-                   mailbox #( symb_data_t )    in_data,
-                   mailbox #( symb_data_t )    out_data 
+    function new ( input virtual ast_interface #(.DATA_W(DATA_W), .EMPTY_W(EMPTY_W), .CHANNEL_W(CHANNEL_W)) dut_interface,
+                   mailbox #( symb_data_t )    mbx_data
                  );
 
       vif         = dut_interface;
-      input_data  = in_data;
-      output_data = out_data;
+      input_data  = mbx_data;
       timeout_ctr = 0;
 
     endfunction
@@ -295,16 +295,11 @@ package tb_env;
     task run;
 
       while ( timeout_ctr < TIMEOUT )
-        begin
-          fork
-            get_input_data();
-            get_output_data();
-          join
-        end
+        get_data();
 
     endtask
 
-    task get_input_data;
+    task get_data;
 
       symb_data_t data;
       int         start_of_packet_flag;
@@ -316,24 +311,24 @@ package tb_env;
         begin
           @( posedge vif.clk );
 
-          if ( vif.ast_startofpacket_i === 1'b1 && vif.ast_valid_i == 1'b1 && vif.ast_ready_o === 1'b1 )
+          if ( vif.ast_startofpacket === 1'b1 && vif.ast_valid == 1'b1 && vif.ast_ready === 1'b1 )
             start_of_packet_flag = 1;
-          if ( vif.srst_i === 1'b1 )
+          if ( vif.srst === 1'b1 )
             begin
               timeout_ctr = 0;
               continue;
             end
             
-          if ( vif.ast_valid_i === 1'b1 && vif.ast_ready_o === 1'b1 && start_of_packet_flag )
+          if ( vif.ast_valid === 1'b1 && vif.ast_ready === 1'b1 && start_of_packet_flag )
             begin
               // Transaction without errors can be finished only with endofpacket raised
-              if ( vif.ast_endofpacket_i === 1'b1 )
+              if ( vif.ast_endofpacket === 1'b1 )
                 begin
                   timeout_ctr = 0;
 
-                  for ( int i = 0; i < 2**EMPTY_IN_W - vif.ast_empty_i; i++ )
+                  for ( int i = 0; i < 2**EMPTY_IN_W - vif.ast_empty; i++ )
                     begin
-                      data.push_back( vif.ast_data_i[i*8 +: 8] );
+                      data.push_back( vif.ast_data[i*8 +: 8] );
                     end
 
                   input_data.put(data);
@@ -345,60 +340,9 @@ package tb_env;
 
                   for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
                     begin
-                      data.push_back( vif.ast_data_i[i*8 +: 8] );
+                      data.push_back( vif.ast_data[i*8 +: 8] );
                     end
                 end
-            end
-        end
-
-
-    endtask
-
-    task get_output_data;
-
-      symb_data_t data;
-      int         start_of_packet_flag;
-
-      start_of_packet_flag = 0;
-      data                 = {};
-
-
-      while ( timeout_ctr++ < TIMEOUT )
-        begin
-          @( posedge vif.clk );
-
-          if ( vif.ast_startofpacket_o === 1'b1 && vif.ast_valid_o == 1'b1 && vif.ast_ready_i === 1'b1 )
-            start_of_packet_flag = 1;
-          if ( vif.srst_i === 1'b1 )
-            begin
-              timeout_ctr = 0;
-              continue;
-            end
-
-          if ( vif.ast_valid_o === 1'b1 && vif.ast_ready_i === 1'b1 && start_of_packet_flag )
-            begin
-              // Valid transaction without errors can be finished only with endofpacket raised
-              if ( vif.ast_endofpacket_o === 1'b1 )
-                begin
-                  timeout_ctr = 0;
-
-                  for ( int i = 0; i < 2**EMPTY_OUT_W - vif.ast_empty_o; i++ )
-                    begin
-                      data.push_back( vif.ast_data_o[i*8 +: 8] );
-                    end
-
-                  output_data.put(data);
-                  return;
-                end
-              else
-                begin
-                  timeout_ctr = 0;
-
-                  for ( int i = 0; i < 2**EMPTY_OUT_W; i++ )
-                    begin
-                      data.push_back( vif.ast_data_o[i*8 +: 8] );
-                    end
-                end  
             end
         end
 
@@ -463,26 +407,32 @@ package tb_env;
   class Environment;
   // This class will hold all tb elements together
     
-    Driver     driver;
-    Monitor    monitor;
-    Scoreboard scoreboard;
-    Generator  generator;
+    Driver                                                  driver;
+    Monitor #( .DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W) )   in_monitor;
+    Monitor #( .DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W) ) out_monitor;
+    Scoreboard                                              scoreboard;
+    Generator                                               generator;
 
     mailbox #( Transaction ) generated_transactions;
     mailbox #( symb_data_t ) input_data;
     mailbox #( symb_data_t ) output_data;
 
-    virtual ast_interface    vif;
+    virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) i_vif;
+    virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) o_vif;
 
-    function new( input virtual ast_interface dut_interface );
+    function new( input virtual ast_interface #(.DATA_W(DATA_IN_W), .EMPTY_W(EMPTY_IN_W), .CHANNEL_W(CHANNEL_W)) in_dut_interface,
+                  input virtual ast_interface #(.DATA_W(DATA_OUT_W), .EMPTY_W(EMPTY_OUT_W), .CHANNEL_W(CHANNEL_W)) out_dut_interface
+                );
 
       generated_transactions = new();
       input_data             = new();
       output_data            = new();
 
-      vif                    = dut_interface;
-      driver                 = new( vif, generated_transactions );
-      monitor                = new( vif, input_data, output_data );
+      i_vif                  = in_dut_interface;
+      o_vif                  = out_dut_interface;
+      driver                 = new( i_vif, o_vif, generated_transactions );
+      in_monitor             = new( i_vif, input_data );
+      out_monitor            = new( o_vif, output_data );
       scoreboard             = new( input_data, output_data );
       generator              = new( generated_transactions );
       
@@ -492,10 +442,11 @@ package tb_env;
     
       generator.run();
   
-      @( posedge vif.clk );
+      @( posedge i_vif.clk );
       fork 
         driver.run();
-        monitor.run();
+        in_monitor.run();
+        out_monitor.run();
       join
 
       scoreboard.run();
