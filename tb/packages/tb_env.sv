@@ -296,6 +296,54 @@ package tb_env;
 
       generated_transactions.put(tr);
 
+      // Transaction without valid at endofpacket
+      tr     = new();
+      tr.len = WORK_TR_LEN ;
+
+      repeat(WORK_TR_LEN)
+        begin
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( 0 );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b0 );
+          tr.endofpacket.push_back( 1'b0 );
+        end
+
+      tr.valid[0]         = 1'b0;
+      tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.wait_dut_ready   = 1'b1;
+
+      generated_transactions.put(tr);
+
+      // Transactions with length and empty progression
+      for ( int i = 2; i < WORK_TR_LEN*4; i++ )
+        begin
+          tr     = new();
+          tr.len = i;
+
+          repeat(i)
+            begin
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( i );
+              tr.valid.push_back( 1'b1 );
+              tr.ready.push_back( 1'b1 );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
+            end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.wait_dut_ready   = 1'b1;
+
+          generated_transactions.put(tr);
+        end
+
     endtask 
     
   endclass
