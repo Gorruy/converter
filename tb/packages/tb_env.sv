@@ -202,11 +202,12 @@ package tb_env;
               tr.valid[i]         = $urandom_range( 1, 0 );
               tr.empty[i]         = $urandom_range( 2**EMPTY_IN_W, 0 );
               tr.channel[i]       = $urandom_range( 2**CHANNEL_W, 0 );
-              tr.startofpacket[i] = $urandom_range( 1, 0 );
               tr.endofpacket[i]   = $urandom_range( 1, 0 );
             end
 
-          tr.reset[0] = 1'b1;
+          tr.valid[$]       = 1'b1;
+          tr.reset[0]       = 1'b1;
+          tr.endofpacket[$] = 1'b0;
           generated_transactions.put(tr);
 
         end
@@ -257,7 +258,7 @@ package tb_env;
           @( posedge vif.clk );
         end
 
-      flush_in();
+      in_flush();
 
     endtask
 
@@ -273,7 +274,7 @@ package tb_env;
 
     endtask
 
-    task flush_in;
+    task in_flush;
 
       @( posedge vif.clk );
       vif.ast_channel       <= '0;
@@ -286,7 +287,7 @@ package tb_env;
 
     endtask
 
-    task flush_out;
+    task out_flush;
 
       @( posedge vif.clk );
       vif.ast_ready <= 1'b0;
@@ -514,8 +515,8 @@ package tb_env;
     
       generator.run();
 
-      in_driver.flush_in();
-      out_driver.flush_out();
+      in_driver.in_flush();
+      out_driver.out_flush();
   
       @( posedge i_vif.clk );
 
