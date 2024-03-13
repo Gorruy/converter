@@ -17,6 +17,29 @@ package tb_env;
     queued_bits_t endofpacket;
     bit           wait_dut_ready;
     queued_bits_t reset;
+
+    function new( input int tr_length = WORK_TR_LEN );
+
+      this.len = tr_length;
+
+      repeat(this.len)
+        begin
+          this.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          this.channel.push_back( '0 );
+          this.empty.push_back( '0 );
+          this.valid.push_back( 1'b1 );
+          this.ready.push_back( 1'b1 );
+          this.startofpacket.push_back( 1'b0 );
+          this.endofpacket.push_back( 1'b0 );
+          this.reset.push_back( 1'b0 );
+        end
+
+      this.startofpacket[$] = 1'b1;
+      this.endofpacket[0]   = 1'b1;
+      this.wait_dut_ready   = 1'b1;
+
+    endfunction    
     
   endclass
   
@@ -36,325 +59,135 @@ package tb_env;
       Transaction tr;
 
       // Normal transaction
-      tr     = new();
-      tr.len = WORK_TR_LEN ;
-
-      repeat(WORK_TR_LEN)
-        begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( '0 );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b0 );
-          tr.endofpacket.push_back( 1'b0 );
-          tr.reset.push_back( 1'b0 );
-        end
-
-      tr.startofpacket[$] = 1'b1;
-      tr.endofpacket[0]   = 1'b1;
-      tr.wait_dut_ready   = 1'b1;
+      tr = new();
 
       generated_transactions.put(tr);
 
       // Transactions of length one
       repeat ( NUMBER_OF_ONE_LENGHT_RUNS )
         begin
-          tr     = new();
-          tr.len = 1;
-
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( '0 );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b1 );
-          tr.endofpacket.push_back( 1'b1 );
-          tr.reset.push_back( 1'b0 );
-
-          tr.wait_dut_ready = 1'b1;
-
+          tr = new( .tr_length(1)) ;
           generated_transactions.put(tr);
         end
 
       // Transaction without valid
-      tr     = new();
-      tr.len = WORK_TR_LEN ;
-
-      repeat(WORK_TR_LEN)
+      tr = new();
+      foreach( tr.data[i] )
         begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-          tr.valid.push_back( 1'b0 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b0 );
-          tr.endofpacket.push_back( 1'b0 );
-          tr.reset.push_back( 1'b0 );
+          tr.valid[i] = 1'b0;
         end
-
-      tr.startofpacket[$] = 1'b1;
-      tr.endofpacket[0]   = 1'b1;
-      tr.wait_dut_ready   = 1'b1;
 
       generated_transactions.put(tr);
 
-      // Transactions of max length with random valid
+      // Transactions of work length with random valid
       repeat (NUMBER_OF_TEST_RUNS)
         begin
-          tr     = new();
-          tr.len = WORK_TR_LEN ;
+          tr  = new();
 
-          repeat(WORK_TR_LEN)
+          foreach( tr.data[i] )
             begin
-              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-    
-              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-              tr.valid.push_back( $urandom_range( 1, 0 ) );
-              tr.ready.push_back( 1'b1 );
-              tr.startofpacket.push_back( 1'b0 );
-              tr.endofpacket.push_back( 1'b0 );
-              tr.reset.push_back( 1'b0 );
+              tr.valid[i] = $urandom_range( 1, 0 );
             end
 
-          tr.startofpacket[$] = 1'b1;
-          tr.endofpacket[0]   = 1'b1;
           tr.valid[$]         = 1'b1;
           tr.valid[0]         = 1'b1;
-          tr.wait_dut_ready   = 1'b1;
 
           generated_transactions.put(tr);
         end
 
 
-      // Transactions of max length with empty's values progression
+      // Transactions of work length with empty's values progression
       for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
         begin
-          tr     = new();
-          tr.len = WORK_TR_LEN ;
+          tr = new();
 
-          repeat(WORK_TR_LEN)
+          foreach( tr.data[j] )
             begin
-              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-    
-              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-              tr.empty.push_back( i );
-              tr.valid.push_back( 1'b1 );
-              tr.ready.push_back( 1'b1 );
-              tr.startofpacket.push_back( 1'b0 );
-              tr.endofpacket.push_back( 1'b0 );
-              tr.reset.push_back( 1'b0 );
+              tr.empty[j] = i;
             end
-
-          tr.startofpacket[$] = 1'b1;
-          tr.endofpacket[0]   = 1'b1;
-          tr.ready[0]         = 1'b1;
-          tr.wait_dut_ready   = 1'b1;
 
           generated_transactions.put(tr);
         end
 
       // Transaction with constant high value of startofpacket 
-      tr     = new();
-      tr.len = WORK_TR_LEN;
+      tr = new();
 
-      repeat(WORK_TR_LEN)
+      foreach( tr.data[i] )
         begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-          tr.valid.push_back( 1'b0 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b1 );
-          tr.endofpacket.push_back( 1'b0 );
-          tr.reset.push_back( 1'b0 );
+          tr.startofpacket[i] = 1'b1;
         end
-      tr.endofpacket[0]   = 1'b1;
-      tr.valid[$]         = 1'b1;
-      tr.valid[0]         = 1'b1;
-      tr.ready[0]         = 1'b1;
-      tr.startofpacket[0] = 1'b0;
-      tr.wait_dut_ready   = 1'b0;
 
       generated_transactions.put(tr);
 
-      // Transactions of max length with random ready
+      // Transactions of work length with random ready
       repeat (NUMBER_OF_TEST_RUNS)
         begin
-          tr     = new();
-          tr.len = WORK_TR_LEN ;
+          tr = new();
 
-          repeat(WORK_TR_LEN)
+          foreach( tr.data[i] )
             begin
-              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-    
-              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-              tr.valid.push_back( 1'b1 );
-              tr.ready.push_back( $urandom_range( 1, 0 ) );
-              tr.startofpacket.push_back( 1'b0 );
-              tr.endofpacket.push_back( 1'b0 );
-              tr.reset.push_back( 1'b0 );
+              tr.ready[i] = $urandom_range( 1, 0 );
             end
 
-          tr.startofpacket[$] = 1'b1;
-          tr.endofpacket[0]   = 1'b1;
-          tr.valid[$]         = 1'b1;
-          tr.valid[0]         = 1'b1;
           tr.wait_dut_ready   = 1'b0;
 
           generated_transactions.put(tr);
+
         end
 
-      // Transactions of max length without ready
-      tr     = new();
-      tr.len = WORK_TR_LEN;
-
+      // Transactions of work length without ready
       repeat (NUMBER_OF_TEST_RUNS)
         begin
-          tr     = new();
-          tr.len = WORK_TR_LEN ;
+          tr = new();
 
-          repeat(WORK_TR_LEN)
+          repeat(tr.len)
             begin
-              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-    
-              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-              tr.valid.push_back( 1'b1 );
               tr.ready.push_back( 1'b0 );
-              tr.startofpacket.push_back( 1'b0 );
-              tr.endofpacket.push_back( 1'b0 );
-              tr.reset.push_back( 1'b0 );
             end
 
-          tr.startofpacket[$] = 1'b1;
-          tr.endofpacket[0]   = 1'b1;
-          tr.valid[$]         = 1'b1;
-          tr.valid[0]         = 1'b1;
           tr.wait_dut_ready   = 1'b1;
 
           generated_transactions.put(tr);
         end
 
       // transaction without startofpacket
-      tr     = new();
-      tr.len = WORK_TR_LEN;
+      tr = new();
 
-      repeat(tr.len)
+      foreach( tr.data[i] )
         begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( '0 );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b0 );
-          tr.endofpacket.push_back( 1'b0 );
-          tr.reset.push_back( 1'b0 );
+          tr.startofpacket[i] = 1'b0;
         end
-
-      tr.endofpacket[0]   = 1'b1;
-      tr.wait_dut_ready   = 1'b1;
 
       generated_transactions.put(tr);
 
       // Transactions with length progression
       for ( int i = 2; i < WORK_TR_LEN; i++ )
         begin
-          tr     = new();
-          tr.len = i ;
-
-          repeat(i)
-            begin
-              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-              tr.empty.push_back( '0 );
-              tr.valid.push_back( 1'b1 );
-              tr.ready.push_back( 1'b1 );
-              tr.startofpacket.push_back( 1'b0 );
-              tr.endofpacket.push_back( 1'b0 );
-              tr.reset.push_back( 1'b0 );
-            end
-
-          tr.startofpacket[$] = 1'b1;
-          tr.endofpacket[0]   = 1'b1;
-          tr.wait_dut_ready   = 1'b1;
+          tr = new(.tr_length(i));
 
           generated_transactions.put(tr);
+
         end
 
       // Normal transaction of max length
-      tr     = new();
-      tr.len = MAX_TR_LEN - 1;
-
-      repeat(tr.len)
-        begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( '0 );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b0 );
-          tr.endofpacket.push_back( 1'b0 );
-          tr.reset.push_back( 1'b0 );
-        end
-
-      tr.startofpacket[$] = 1'b1;
-      tr.endofpacket[0]   = 1'b1;
-      tr.wait_dut_ready   = 1'b1;
+      tr = new(.tr_length(MAX_TR_LEN));
 
       generated_transactions.put(tr);
 
       // Transaction with reset in between
-      tr     = new();
-      tr.len = WORK_TR_LEN ;
+      tr = new();
 
-      repeat(tr.len)
-        begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( '0 );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b0 );
-          tr.endofpacket.push_back( 1'b0 );
-          tr.reset.push_back( 1'b0 );
-        end
-
-      tr.startofpacket[$]     = 1'b1;
-      tr.endofpacket[0]       = 1'b1;
       tr.reset[WORK_TR_LEN/2] = 1'b1;
-      tr.wait_dut_ready       = 1'b1;
 
       generated_transactions.put(tr);
 
       // Transaction with const reset
-      tr     = new();
-      tr.len = WORK_TR_LEN ;
+      tr = new();
 
-      repeat(WORK_TR_LEN)
+      foreach( tr.data[i] )
         begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( '0 );
-          tr.valid.push_back( 1'b1 );
-          tr.ready.push_back( 1'b1 );
-          tr.startofpacket.push_back( 1'b0 );
-          tr.endofpacket.push_back( 1'b0 );
-          tr.reset.push_back( 1'b1 );
+          tr.reset[i] = 1'b1;
         end
-
-      tr.startofpacket[$] = 1'b1;
-      tr.endofpacket[0]   = 1'b1;
-      tr.wait_dut_ready   = 1'b1;
 
       generated_transactions.put(tr);
 
