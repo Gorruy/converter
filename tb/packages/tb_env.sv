@@ -19,6 +19,7 @@ package tb_env;
     queued_bits_t reset;
 
     function new( input int tr_length = WORK_TR_LEN );
+    // new will generate normal transaction
 
       this.len = tr_length;
 
@@ -177,7 +178,7 @@ package tb_env;
       // Transaction with reset in between
       tr = new();
 
-      tr.reset[WORK_TR_LEN/2] = 1'b1;
+      tr.reset[tr.len/2] = 1'b1;
 
       generated_transactions.put(tr);
 
@@ -189,7 +190,26 @@ package tb_env;
           tr.reset[i] = 1'b1;
         end
 
-      generated_transactions.put(tr);
+      // full random transaction finished with reset
+      repeat(NUMBER_OF_RANDOM_RUNS)
+        begin
+
+          tr = new();
+
+          foreach( tr.data[i] )
+            begin
+              tr.ready[i]         = $urandom_range( 1, 0 );
+              tr.valid[i]         = $urandom_range( 1, 0 );
+              tr.empty[i]         = $urandom_range( 2**EMPTY_IN_W, 0 );
+              tr.channel[i]       = $urandom_range( 2**CHANNEL_W, 0 );
+              tr.startofpacket[i] = $urandom_range( 1, 0 );
+              tr.endofpacket[i]   = $urandom_range( 1, 0 );
+            end
+
+          tr.reset[0] = 1'b1;
+          generated_transactions.put(tr);
+
+        end
 
     endtask 
     

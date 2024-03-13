@@ -13,6 +13,7 @@ package usr_types_and_params;
   parameter DR_TIMEOUT                = WORK_TR_LEN;
   parameter MAX_DATA_VALUE            = 2**DATA_IN_W - 1;
   parameter NUMBER_OF_ONE_LENGHT_RUNS = 1;
+  parameter NUMBER_OF_RANDOM_RUNS     = 10;
 
   typedef logic [DATA_IN_W - 1:0]   in_data_t[$];
   typedef logic [DATA_OUT_W - 1:0]  out_data_t[$];
