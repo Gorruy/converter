@@ -36,9 +36,9 @@ package tb_env;
 
       // Normal transaction
       tr     = new();
-      tr.len = MAX_TR_LEN ;
+      tr.len = WORK_TR_LEN ;
 
-      repeat(MAX_TR_LEN)
+      repeat(WORK_TR_LEN)
         begin
           tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
 
@@ -77,9 +77,9 @@ package tb_env;
 
       // Transaction without valid
       tr     = new();
-      tr.len = MAX_TR_LEN ;
+      tr.len = WORK_TR_LEN ;
 
-      repeat(MAX_TR_LEN)
+      repeat(WORK_TR_LEN)
         begin
           tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
 
@@ -101,9 +101,9 @@ package tb_env;
       repeat (NUMBER_OF_TEST_RUNS)
         begin
           tr     = new();
-          tr.len = MAX_TR_LEN ;
+          tr.len = WORK_TR_LEN ;
 
-          repeat(MAX_TR_LEN)
+          repeat(WORK_TR_LEN)
             begin
               tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
     
@@ -129,9 +129,9 @@ package tb_env;
       for ( int i = 0; i < 2**EMPTY_IN_W; i++ )
         begin
           tr     = new();
-          tr.len = MAX_TR_LEN ;
+          tr.len = WORK_TR_LEN ;
 
-          repeat(MAX_TR_LEN)
+          repeat(WORK_TR_LEN)
             begin
               tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
     
@@ -153,9 +153,9 @@ package tb_env;
 
       // Transaction with constant high value of startofpacket 
       tr     = new();
-      tr.len = MAX_TR_LEN;
+      tr.len = WORK_TR_LEN;
 
-      repeat(MAX_TR_LEN)
+      repeat(WORK_TR_LEN)
         begin
           tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
           tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
@@ -178,9 +178,9 @@ package tb_env;
       repeat (NUMBER_OF_TEST_RUNS)
         begin
           tr     = new();
-          tr.len = MAX_TR_LEN ;
+          tr.len = WORK_TR_LEN ;
 
-          repeat(MAX_TR_LEN)
+          repeat(WORK_TR_LEN)
             begin
               tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
     
@@ -205,9 +205,9 @@ package tb_env;
       repeat (NUMBER_OF_TEST_RUNS)
         begin
           tr     = new();
-          tr.len = MAX_TR_LEN ;
+          tr.len = WORK_TR_LEN ;
 
-          repeat(MAX_TR_LEN)
+          repeat(WORK_TR_LEN)
             begin
               tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
     
@@ -227,6 +227,74 @@ package tb_env;
 
           generated_transactions.put(tr);
         end
+
+      // transaction without startofpacket
+      tr     = new();
+      tr.len = WORK_TR_LEN;
+
+      repeat(tr.len)
+        begin
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( '0 );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b0 );
+          tr.endofpacket.push_back( 1'b0 );
+        end
+
+      tr.endofpacket[0]   = 1'b1;
+      tr.wait_dut_ready   = 1'b1;
+
+      generated_transactions.put(tr);
+
+      // Transactions with length progression
+      for ( int i = 2; i < WORK_TR_LEN; i++ )
+        begin
+          tr     = new();
+          tr.len = i ;
+
+          repeat(i)
+            begin
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( '0 );
+              tr.valid.push_back( 1'b1 );
+              tr.ready.push_back( 1'b1 );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
+            end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.wait_dut_ready   = 1'b1;
+
+          generated_transactions.put(tr);
+        end
+
+      // Normal transaction of max length
+      tr     = new();
+      tr.len = MAX_TR_LEN - 1;
+
+      repeat(tr.len)
+        begin
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( '0 );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b0 );
+          tr.endofpacket.push_back( 1'b0 );
+        end
+
+      tr.startofpacket[$] = 1'b1;
+      tr.endofpacket[0]   = 1'b1;
+      tr.wait_dut_ready   = 1'b1;
+
+      generated_transactions.put(tr);
 
     endtask 
     
@@ -352,11 +420,14 @@ package tb_env;
 
           if ( vif.ast_startofpacket === 1'b1 && vif.ast_valid == 1'b1 && vif.ast_ready === 1'b1 )
             begin
-              channel = vif.ast_channel;
-              channel_mbx.put(channel);
-              start_of_packet_flag = 1;
               if ( start_of_packet_flag == 1 )
                 data = {};
+              else
+                begin
+                  channel = vif.ast_channel;
+                  channel_mbx.put(channel);
+                end
+              start_of_packet_flag = 1;
             end
           if ( vif.srst === 1'b1 )
             break;
@@ -424,7 +495,7 @@ package tb_env;
       logic [CHANNEL_W - 1:0] out_channel;
 
       if ( input_channel.num() != output_channel.num() )
-        $error("Read more channels than was written");
+        $error("Error in read channels amount:rd%d, wr%d", output_channel.num(), input_channel.num() );
       else 
         begin
           while ( input_channel.num() && output_channel.num() )
@@ -433,7 +504,7 @@ package tb_env;
               output_channel.get(out_channel);
 
               if ( in_channel !== out_channel )
-                $error("Read and written channels not equal");
+                $error("Read and written channels not equal:rd%d, wr%d", out_channel, in_channel);
             end
         end
 
@@ -448,8 +519,8 @@ package tb_env;
           if ( in_data.size() != out_data.size() )
             begin
               $error( "data sizes dont match!: wr size:%d, rd size:%d ", in_data.size(), out_data.size() );
-              $displayh( "wr data:%p", in_data );
-              $displayh( "rd data:%p", out_data );
+              $displayh( "wr data:%p", in_data[$ -: WORK_TR_LEN] );
+              $displayh( "rd data:%p", out_data[$ -: WORK_TR_LEN] );
             end
           else
             begin
@@ -458,16 +529,16 @@ package tb_env;
                   if ( in_data[i] === 'x || out_data[i] === 'x && in_data[i] !== out_data[i] )
                     begin
                       $error("Error during transaction!! Wrong control signals values");
-                      $displayh( "wr data:%p", in_data );
-                      $displayh( "rd data:%p", out_data );
+                      $displayh( "wr data:%p", in_data[$ -: WORK_TR_LEN] );
+                      $displayh( "rd data:%p", out_data[$ -: WORK_TR_LEN] );
                       $display( "Index: %d", i );
                       break;
                     end
                   if ( in_data[i] !== out_data[i] )
                     begin
                       $error( "wrong data!" );
-                      $displayh( "wr data:%p", in_data );
-                      $displayh( "rd data:%p", out_data );
+                      $displayh( "wr data:%p", in_data[$ -: WORK_TR_LEN] );
+                      $displayh( "rd data:%p", out_data[$ -: WORK_TR_LEN] );
                       $display( "Index: %d", i );
                       break;
                     end
