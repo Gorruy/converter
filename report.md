@@ -51,7 +51,7 @@ Time: 2125 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 539`
 `Index:           0`
 
 
-6. Модуль начинает выдавать данные без начала транзакции.
+6. Модуль начинает выдавать данные без начала транзакции и не сбрасывает сигнал готовности.
 
 `Error: Error during transaction!! Wrong control signals values
 Time: 3005 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 531`
