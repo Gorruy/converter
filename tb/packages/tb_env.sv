@@ -16,6 +16,7 @@ package tb_env;
     queued_bits_t startofpacket;
     queued_bits_t endofpacket;
     bit           wait_dut_ready;
+    queued_bits_t reset;
     
   endclass
   
@@ -48,6 +49,7 @@ package tb_env;
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b0 );
           tr.endofpacket.push_back( 1'b0 );
+          tr.reset.push_back( 1'b0 );
         end
 
       tr.startofpacket[$] = 1'b1;
@@ -69,6 +71,7 @@ package tb_env;
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b1 );
           tr.endofpacket.push_back( 1'b1 );
+          tr.reset.push_back( 1'b0 );
 
           tr.wait_dut_ready = 1'b1;
 
@@ -89,6 +92,7 @@ package tb_env;
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b0 );
           tr.endofpacket.push_back( 1'b0 );
+          tr.reset.push_back( 1'b0 );
         end
 
       tr.startofpacket[$] = 1'b1;
@@ -113,6 +117,7 @@ package tb_env;
               tr.ready.push_back( 1'b1 );
               tr.startofpacket.push_back( 1'b0 );
               tr.endofpacket.push_back( 1'b0 );
+              tr.reset.push_back( 1'b0 );
             end
 
           tr.startofpacket[$] = 1'b1;
@@ -141,6 +146,7 @@ package tb_env;
               tr.ready.push_back( 1'b1 );
               tr.startofpacket.push_back( 1'b0 );
               tr.endofpacket.push_back( 1'b0 );
+              tr.reset.push_back( 1'b0 );
             end
 
           tr.startofpacket[$] = 1'b1;
@@ -164,6 +170,7 @@ package tb_env;
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b1 );
           tr.endofpacket.push_back( 1'b0 );
+          tr.reset.push_back( 1'b0 );
         end
       tr.endofpacket[0]   = 1'b1;
       tr.valid[$]         = 1'b1;
@@ -190,6 +197,7 @@ package tb_env;
               tr.ready.push_back( $urandom_range( 1, 0 ) );
               tr.startofpacket.push_back( 1'b0 );
               tr.endofpacket.push_back( 1'b0 );
+              tr.reset.push_back( 1'b0 );
             end
 
           tr.startofpacket[$] = 1'b1;
@@ -202,6 +210,9 @@ package tb_env;
         end
 
       // Transactions of max length without ready
+      tr     = new();
+      tr.len = WORK_TR_LEN;
+
       repeat (NUMBER_OF_TEST_RUNS)
         begin
           tr     = new();
@@ -217,6 +228,7 @@ package tb_env;
               tr.ready.push_back( 1'b0 );
               tr.startofpacket.push_back( 1'b0 );
               tr.endofpacket.push_back( 1'b0 );
+              tr.reset.push_back( 1'b0 );
             end
 
           tr.startofpacket[$] = 1'b1;
@@ -242,6 +254,7 @@ package tb_env;
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b0 );
           tr.endofpacket.push_back( 1'b0 );
+          tr.reset.push_back( 1'b0 );
         end
 
       tr.endofpacket[0]   = 1'b1;
@@ -265,6 +278,7 @@ package tb_env;
               tr.ready.push_back( 1'b1 );
               tr.startofpacket.push_back( 1'b0 );
               tr.endofpacket.push_back( 1'b0 );
+              tr.reset.push_back( 1'b0 );
             end
 
           tr.startofpacket[$] = 1'b1;
@@ -288,6 +302,7 @@ package tb_env;
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b0 );
           tr.endofpacket.push_back( 1'b0 );
+          tr.reset.push_back( 1'b0 );
         end
 
       tr.startofpacket[$] = 1'b1;
@@ -296,7 +311,31 @@ package tb_env;
 
       generated_transactions.put(tr);
 
-      // Transaction without valid at endofpacket
+      // Transaction with reset in between
+      tr     = new();
+      tr.len = WORK_TR_LEN ;
+
+      repeat(tr.len)
+        begin
+          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+
+          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+          tr.empty.push_back( '0 );
+          tr.valid.push_back( 1'b1 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b0 );
+          tr.endofpacket.push_back( 1'b0 );
+          tr.reset.push_back( 1'b0 );
+        end
+
+      tr.startofpacket[$]     = 1'b1;
+      tr.endofpacket[0]       = 1'b1;
+      tr.reset[WORK_TR_LEN/2] = 1'b1;
+      tr.wait_dut_ready       = 1'b1;
+
+      generated_transactions.put(tr);
+
+      // Transaction with const reset
       tr     = new();
       tr.len = WORK_TR_LEN ;
 
@@ -305,44 +344,19 @@ package tb_env;
           tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
 
           tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( 0 );
+          tr.empty.push_back( '0 );
           tr.valid.push_back( 1'b1 );
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b0 );
           tr.endofpacket.push_back( 1'b0 );
+          tr.reset.push_back( 1'b1 );
         end
 
-      tr.valid[0]         = 1'b0;
       tr.startofpacket[$] = 1'b1;
       tr.endofpacket[0]   = 1'b1;
       tr.wait_dut_ready   = 1'b1;
 
       generated_transactions.put(tr);
-
-      // Transactions with length and empty progression
-      for ( int i = 2; i < WORK_TR_LEN*4; i++ )
-        begin
-          tr     = new();
-          tr.len = i;
-
-          repeat(i)
-            begin
-              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-
-              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-              tr.empty.push_back( i );
-              tr.valid.push_back( 1'b1 );
-              tr.ready.push_back( 1'b1 );
-              tr.startofpacket.push_back( 1'b0 );
-              tr.endofpacket.push_back( 1'b0 );
-            end
-
-          tr.startofpacket[$] = 1'b1;
-          tr.endofpacket[0]   = 1'b1;
-          tr.wait_dut_ready   = 1'b1;
-
-          generated_transactions.put(tr);
-        end
 
     endtask 
     
@@ -381,6 +395,7 @@ package tb_env;
           vif.ast_startofpacket <= tr.startofpacket.pop_back();
           vif.ast_endofpacket   <= tr.endofpacket.pop_back();  
           vif.ast_data          <= tr.data.pop_back();
+          vif.srst              <= tr.reset.pop_back();
         end
 
       // This loop will finish transaction if end of transaction and ready_o doesn't met
@@ -414,6 +429,7 @@ package tb_env;
       vif.ast_startofpacket <= 1'b0;
       vif.ast_endofpacket   <= 1'b0;
       vif.ast_data          <= '0;
+      vif.srst              <= 1'b0;
 
     endtask
 
@@ -649,6 +665,8 @@ package tb_env;
       out_driver.flush_out();
   
       @( posedge i_vif.clk );
+
+      i_vif.set_reset();
       
       while ( generated_transactions.num() )
         begin

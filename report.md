@@ -28,9 +28,18 @@ Time: 805 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 531`
 
 `rd data:'{xx, xx, xx, xx, xx, xx, xx, xx, xx, xx}`
 
+4. Модуль продолжает выдавать значения после ресета внутри транзакции
+
+Error: data sizes dont match!: wr size:         33, rd size:          1
+Time: 13965 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 562`
+
+wr data:'{00, f3, ff, bd, e8, 00, 00, 00, 00, xx}`
+
+rd data:'{xx, xx, xx, xx, xx, xx, xx, xx, xx, xx}`
+
 ### Следующие ошибки связаны с тем, что модуль просто пропускает через себя ошибки источника транзакции 
 
-4. Модуль начинает транзакцию заного при поступлении сигнала startofpacket до завершения предыдущей транзакции.
+5. Модуль начинает транзакцию заного при поступлении сигнала startofpacket до завершения предыдущей транзакции.
 
 `Error: wrong data!
 Time: 2125 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 539`
@@ -42,7 +51,7 @@ Time: 2125 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 539`
 `Index:           0`
 
 
-5. Модуль начинает выдавать данные без начала транзакции.
+6. Модуль начинает выдавать данные без начала транзакции.
 
 `Error: Error during transaction!! Wrong control signals values
 Time: 3005 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 531`
@@ -52,3 +61,4 @@ Time: 3005 ps  Scope: tb_env.Scoreboard.run File: packages/tb_env.sv Line: 531`
 `rd data:'{xx, xx, xx, xx, xx, xx, xx, xx, xx, xx}`
 
 `Index:           0`
+

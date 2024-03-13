@@ -3,9 +3,19 @@ interface ast_interface #(
   parameter EMPTY_W   = 1,
   parameter CHANNEL_W = 1
  ) ( 
-  input bit   clk,
-  input logic srst
+  input bit clk,
+  ref   bit srst
 );
+
+  task set_reset;
+  
+    srst = 1'b0;
+    @( posedge clk );
+    srst = 1'b1;
+    @( posedge clk );
+    srst = 1'b0;
+
+  endtask
 
   logic [DATA_W-1:0]    ast_data;
   logic                 ast_startofpacket;

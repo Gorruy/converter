@@ -4,7 +4,7 @@ module top_tb;
   import tb_env::Environment;
 
   bit   clk;
-  logic srst;
+  bit   srst;
   bit   srst_done;
 
   initial forever #5 clk = !clk;
@@ -55,22 +55,9 @@ module top_tb;
 
   initial 
     begin
-      @( posedge clk );
-      srst      <= 1'b0;
-      @( posedge clk );
-      srst      <= 1'b1;
-      @( posedge clk );
-      srst      <= 1'b0;
-      srst_done <= 1'b1;
-    end
-
-  initial 
-    begin
 
       Environment env;
       env = new( ast_if_in, ast_if_out );
-   
-      wait( srst_done );
 
       env.run();
 
