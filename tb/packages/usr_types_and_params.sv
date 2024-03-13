@@ -21,7 +21,7 @@ package usr_types_and_params;
   typedef logic [CHANNEL_W - 1:0]   channel_t;
   typedef logic [EMPTY_IN_W - 1:0]  empty_in_t;
   typedef logic [EMPTY_OUT_W - 1:0] empty_out_t;
-  typedef logic [7:0]               symb_data_t[$];
+  typedef logic [7:0]               byte_data_t[$];
   
   typedef bit                       queued_bits_t[$];
 

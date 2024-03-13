@@ -43,7 +43,7 @@ package tb_env;
           tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
 
           tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.empty.push_back( '0 );
           tr.valid.push_back( 1'b1 );
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b0 );
@@ -56,7 +56,7 @@ package tb_env;
 
       generated_transactions.put(tr);
 
-      // Trancastions of length one
+      // Transactions of length one
       repeat ( NUMBER_OF_ONE_LENGHT_RUNS )
         begin
           tr     = new();
@@ -64,7 +64,7 @@ package tb_env;
 
           tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
           tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+          tr.empty.push_back( '0 );
           tr.valid.push_back( 1'b1 );
           tr.ready.push_back( 1'b1 );
           tr.startofpacket.push_back( 1'b1 );
@@ -136,7 +136,7 @@ package tb_env;
               tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
     
               tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+              tr.empty.push_back( i );
               tr.valid.push_back( 1'b1 );
               tr.ready.push_back( 1'b1 );
               tr.startofpacket.push_back( 1'b0 );
@@ -151,7 +151,7 @@ package tb_env;
           generated_transactions.put(tr);
         end
 
-      // Transaction with random values of startofpacket 
+      // Transaction with constant high value of startofpacket 
       tr     = new();
       tr.len = MAX_TR_LEN;
 
@@ -160,40 +160,16 @@ package tb_env;
           tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
           tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
           tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-          tr.valid.push_back( $urandom_range( 1, 0 ) );
-          tr.ready.push_back( $urandom_range( 1, 0 ) );
-          tr.startofpacket.push_back( $urandom_range( 1, 0 ) );
+          tr.valid.push_back( 1'b0 );
+          tr.ready.push_back( 1'b1 );
+          tr.startofpacket.push_back( 1'b1 );
           tr.endofpacket.push_back( 1'b0 );
         end
-      tr.startofpacket[$] = 1'b1;
       tr.endofpacket[0]   = 1'b1;
       tr.valid[$]         = 1'b1;
       tr.valid[0]         = 1'b1;
       tr.ready[0]         = 1'b1;
-      tr.wait_dut_ready   = 1'b0;
-
-      generated_transactions.put(tr);
-
-      // Transaction with random values of endofpacket 
-      tr     = new();
-      tr.len = MAX_TR_LEN;
-
-      repeat(MAX_TR_LEN)
-        begin
-          tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
-    
-          tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
-          tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
-          tr.valid.push_back( $urandom_range( 1, 0 ) );
-          tr.ready.push_back( $urandom_range( 1, 0 ) );
-          tr.startofpacket.push_back( 0 );
-          tr.endofpacket.push_back( $urandom_range( 1, 0 ) );
-        end
-      tr.startofpacket[$] = 1'b1;
-      tr.endofpacket[0]   = 1'b1;
-      tr.valid[$]         = 1'b1;
-      tr.valid[0]         = 1'b1;
-      tr.ready[0]         = 1'b1;
+      tr.startofpacket[0] = 1'b0;
       tr.wait_dut_ready   = 1'b0;
 
       generated_transactions.put(tr);
@@ -225,6 +201,33 @@ package tb_env;
           generated_transactions.put(tr);
         end
 
+      // Transactions of max length without ready
+      repeat (NUMBER_OF_TEST_RUNS)
+        begin
+          tr     = new();
+          tr.len = MAX_TR_LEN ;
+
+          repeat(MAX_TR_LEN)
+            begin
+              tr.data.push_back( $urandom_range( MAX_DATA_VALUE, 0 ) );
+    
+              tr.channel.push_back( $urandom_range( 2**CHANNEL_W, 0 ) );
+              tr.empty.push_back( $urandom_range( 2**EMPTY_IN_W, 0 ) );
+              tr.valid.push_back( 1'b1 );
+              tr.ready.push_back( 1'b0 );
+              tr.startofpacket.push_back( 1'b0 );
+              tr.endofpacket.push_back( 1'b0 );
+            end
+
+          tr.startofpacket[$] = 1'b1;
+          tr.endofpacket[0]   = 1'b1;
+          tr.valid[$]         = 1'b1;
+          tr.valid[0]         = 1'b1;
+          tr.wait_dut_ready   = 1'b1;
+
+          generated_transactions.put(tr);
+        end
+
     endtask 
     
   endclass
@@ -233,100 +236,75 @@ package tb_env;
   // This class will drive all dut input signals
   // according to transaction's parameters
 
-    virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) i_vif;
-    virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) o_vif;
-    mailbox #( Transaction ) generated_transactions;
+    virtual ast_interface #( DATA_W, EMPTY_W, CHANNEL_W ) vif;
 
-    function new( input virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) i_dut_interface,
-                  input virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) o_dut_interface,
-                  mailbox #( Transaction )    gen_tr 
-                );
+    function new( input virtual ast_interface #( DATA_W, EMPTY_W, CHANNEL_W ) dut_interface );
 
-      i_vif                  = i_dut_interface;
-      o_vif                  = o_dut_interface;
-      generated_transactions = gen_tr;
+      vif = dut_interface;
 
     endfunction
 
-    task run( input Trancastion tr );
-
-      while ( generated_transactions.num() )
-        begin
-          generated_transactions.get(tr);
-
-          write(tr);
-        end
-
-      fin();
-
-    endtask
-
-    task write ( input Transaction tr );
+    task drive_in( input Transaction tr );
 
       int wr_timeout;
       wr_timeout = 0;
 
       repeat(tr.len)
         begin
-          while ( tr.wait_dut_ready && i_vif.ast_ready !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
+          while ( tr.wait_dut_ready && vif.ast_ready !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
             begin
-              @( posedge i_vif.clk );
+              @( posedge vif.clk );
             end
 
-          @( posedge i_vif.clk );
-          wr_timeout               = 0;
+          @( posedge vif.clk );
+          wr_timeout             = 0;
 
-          i_vif.ast_channel       <= tr.channel.pop_back();      
-          i_vif.ast_empty         <= tr.empty.pop_back();        
-          i_vif.ast_valid         <= tr.valid.pop_back();        
-          o_vif.ast_ready         <= tr.ready.pop_back();        
-          i_vif.ast_startofpacket <= tr.startofpacket.pop_back();
-          i_vif.ast_endofpacket   <= tr.endofpacket.pop_back();  
-          i_vif.ast_data          <= tr.data.pop_back();
+          vif.ast_channel       <= tr.channel.pop_back();      
+          vif.ast_empty         <= tr.empty.pop_back();        
+          vif.ast_valid         <= tr.valid.pop_back();              
+          vif.ast_startofpacket <= tr.startofpacket.pop_back();
+          vif.ast_endofpacket   <= tr.endofpacket.pop_back();  
+          vif.ast_data          <= tr.data.pop_back();
         end
 
       // This loop will finish transaction if end of transaction and ready_o doesn't met
-      while ( i_vif.ast_ready !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
-        @( posedge i_vif.clk );
-
-    endtask
-
-    task init;
-
-      i_vif.ast_channel       <= '0;
-      i_vif.ast_empty         <= '0;
-      i_vif.ast_valid         <= '0;
-      o_vif.ast_ready         <= '0;
-      i_vif.ast_startofpacket <= '0;
-      i_vif.ast_endofpacket   <= '0;
-      i_vif.ast_data          <= '0;
-
-    endtask
-
-    task fin;
-    // Transactions from write task doesnt imply completing of reading
-    // This task will hold ready_i signal to finish transactions
-
-      int finishing_timeout;
-
-      finishing_timeout = 0;
-
-      @( posedge i_vif.clk );
-      o_vif.ast_ready <= 1'b1;
-      @( posedge i_vif.clk );
-
-      while ( i_vif.ast_valid === 1'b1 && finishing_timeout++ < DR_TIMEOUT )
+      while ( vif.ast_ready !== 1'b1 && wr_timeout++ < DR_TIMEOUT )
         begin
-          @( posedge i_vif.clk );
+          @( posedge vif.clk );
         end
 
-      i_vif.ast_channel       <= '0;
-      i_vif.ast_empty         <= '0;
-      i_vif.ast_valid         <= 1'b0;
-      o_vif.ast_ready         <= 1'b0;
-      i_vif.ast_startofpacket <= 1'b0;
-      i_vif.ast_endofpacket   <= 1'b0;
-      i_vif.ast_data          <= '0;
+      flush_in();
+
+    endtask
+
+    task drive_out( input Transaction tr );
+
+      repeat(tr.len)
+        begin
+          @( posedge vif.clk );
+          vif.ast_ready <= tr.ready.pop_back();
+        end
+
+      vif.ast_ready <= 1'b1;
+
+    endtask
+
+    task flush_in;
+
+      @( posedge vif.clk );
+      vif.ast_channel       <= '0;
+      vif.ast_empty         <= 1'b0;
+      vif.ast_valid         <= 1'b0;
+      vif.ast_startofpacket <= 1'b0;
+      vif.ast_endofpacket   <= 1'b0;
+      vif.ast_data          <= '0;
+
+    endtask
+
+    task flush_out;
+
+      @( posedge vif.clk );
+      vif.ast_ready <= 1'b0;
 
     endtask
   
@@ -337,17 +315,17 @@ package tb_env;
   // and send it to Scoreboard
 
      virtual ast_interface #( DATA_W, EMPTY_W, CHANNEL_W ) vif;
-     mailbox #( symb_data_t ) input_data;
-
-    int                      timeout_ctr;
+     mailbox #( byte_data_t )                              input_data;
+     mailbox #( logic [CHANNEL_W - 1:0] )                  channel_mbx;
 
     function new ( input virtual ast_interface #( DATA_W, EMPTY_W, CHANNEL_W ) dut_interface,
-                   mailbox #( symb_data_t )    mbx_data
+                   mailbox #( byte_data_t )                                    mbx_data,
+                   mailbox #( logic [CHANNEL_W - 1:0] )                        in_ch
                  );
 
       vif         = dut_interface;
       input_data  = mbx_data;
-      timeout_ctr = 0;
+      channel_mbx = in_ch;
 
     endfunction
 
@@ -359,25 +337,29 @@ package tb_env;
 
     task get_data;
 
-      symb_data_t data;
-      int         start_of_packet_flag;
+      byte_data_t             data;
+      int                     start_of_packet_flag;
+      int                     timeout_ctr;
+      logic [CHANNEL_W - 1:0] channel;
 
       start_of_packet_flag = 0;
       data                 = {}; 
+      timeout_ctr          = 0;
 
       while ( timeout_ctr++ < TIMEOUT )
         begin
           @( posedge vif.clk );
 
           if ( vif.ast_startofpacket === 1'b1 && vif.ast_valid == 1'b1 && vif.ast_ready === 1'b1 )
-            start_of_packet_flag = 1;
-          if ( vif.srst === 1'b1 )
             begin
-              timeout_ctr          = 0;
-              start_of_packet_flag = 0;
-              data                 = {}; 
-              continue;
+              channel = vif.ast_channel;
+              channel_mbx.put(channel);
+              start_of_packet_flag = 1;
+              if ( start_of_packet_flag == 1 )
+                data = {};
             end
+          if ( vif.srst === 1'b1 )
+            break;
             
           if ( vif.ast_valid === 1'b1 && vif.ast_ready === 1'b1 && start_of_packet_flag )
             begin
@@ -392,9 +374,7 @@ package tb_env;
                     end
 
                   input_data.put(data);
-                  start_of_packet_flag = 0;
-                  data                 = {}; 
-                  continue;
+                  return;
                 end
               else
                 begin
@@ -407,6 +387,9 @@ package tb_env;
                 end
             end
         end
+      
+      data.push_back( 'x );
+      input_data.put(data);
 
     endtask
   
@@ -415,22 +398,44 @@ package tb_env;
   class Scoreboard;
   // This class will compare read and written data
 
-    mailbox #( symb_data_t ) input_data;
-    mailbox #( symb_data_t ) output_data;
+    mailbox #( byte_data_t )             input_data;
+    mailbox #( byte_data_t )             output_data;
+    mailbox #( logic [CHANNEL_W - 1:0] ) input_channel;
+    mailbox #( logic [CHANNEL_W - 1:0] ) output_channel;
 
-    function new ( mailbox #( symb_data_t ) in_data,
-                   mailbox #( symb_data_t ) out_data
+    function new ( mailbox #( byte_data_t )             in_data,
+                   mailbox #( byte_data_t )             out_data,
+                   mailbox #( logic [CHANNEL_W - 1:0] ) in_ch,
+                   mailbox #( logic [CHANNEL_W - 1:0] ) out_ch
                  );
 
-      input_data  = in_data;
-      output_data = out_data;
+      input_data     = in_data;
+      output_data    = out_data;
+      input_channel  = in_ch;
+      output_channel = out_ch;
 
     endfunction
 
     task run;
 
-      symb_data_t in_data;
-      symb_data_t out_data;
+      byte_data_t             in_data;
+      byte_data_t             out_data;
+      logic [CHANNEL_W - 1:0] in_channel;
+      logic [CHANNEL_W - 1:0] out_channel;
+
+      if ( input_channel.num() != output_channel.num() )
+        $error("Read more channels than was written");
+      else 
+        begin
+          while ( input_channel.num() && output_channel.num() )
+            begin
+              input_channel.get(in_channel);
+              output_channel.get(out_channel);
+
+              if ( in_channel !== out_channel )
+                $error("Read and written channels not equal");
+            end
+        end
 
       if ( input_data.num() !== output_data.num() )
         $error( "Number of read and written transactions doesn't equal, wr:%d, rd:%d", input_data.num(), output_data.num() );
@@ -439,7 +444,7 @@ package tb_env;
         begin
           input_data.get(in_data);
           output_data.get(out_data);
-
+          
           if ( in_data.size() != out_data.size() )
             begin
               $error( "data sizes dont match!: wr size:%d, rd size:%d ", in_data.size(), out_data.size() );
@@ -450,7 +455,15 @@ package tb_env;
             begin
               foreach( in_data[i] )
                 begin
-                  if ( in_data[i] != out_data[i] )
+                  if ( in_data[i] === 'x || out_data[i] === 'x && in_data[i] !== out_data[i] )
+                    begin
+                      $error("Error during transaction!! Wrong control signals values");
+                      $displayh( "wr data:%p", in_data );
+                      $displayh( "rd data:%p", out_data );
+                      $display( "Index: %d", i );
+                      break;
+                    end
+                  if ( in_data[i] !== out_data[i] )
                     begin
                       $error( "wrong data!" );
                       $displayh( "wr data:%p", in_data );
@@ -469,51 +482,68 @@ package tb_env;
   class Environment;
   // This class will hold all tb elements together
     
-    Driver #( DATA_IN_W, EMPTY_IN_W )    driver;
-    Monitor #( DATA_IN_W, EMPTY_IN_W )   in_monitor;
-    Monitor #( DATA_OUT_W, EMPTY_OUT_W ) out_monitor;
-    Scoreboard                           scoreboard;
-    Generator                            generator;
+    Driver #( DATA_IN_W, EMPTY_IN_W )                             in_driver;
+    Driver #( DATA_OUT_W, EMPTY_OUT_W )                           out_driver;
+    Monitor #( DATA_IN_W, EMPTY_IN_W )                            in_monitor;
+    Monitor #( DATA_OUT_W, EMPTY_OUT_W )                          out_monitor;
+    Scoreboard                                                    scoreboard;
+    Generator                                                     generator;
 
-    mailbox #( Transaction ) generated_transactions;
-    mailbox #( symb_data_t ) input_data;
-    mailbox #( symb_data_t ) output_data;
+    mailbox #( Transaction )                                      generated_transactions;
+    mailbox #( byte_data_t )                                      input_data;
+    mailbox #( byte_data_t )                                      output_data;
 
-    virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) i_vif;
+    mailbox #( logic [CHANNEL_W - 1:0] )                          in_channel;
+    mailbox #( logic [CHANNEL_W - 1:0] )                          out_channel;
+
+    virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W )   i_vif;
     virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) o_vif;
 
-    function new( input virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W ) in_dut_interface,
+    function new( input virtual ast_interface #( DATA_IN_W, EMPTY_IN_W, CHANNEL_W )   in_dut_interface,
                   input virtual ast_interface #( DATA_OUT_W, EMPTY_OUT_W, CHANNEL_W ) out_dut_interface
                 );
 
       generated_transactions = new();
       input_data             = new();
       output_data            = new();
+      in_channel             = new();
+      out_channel            = new();
 
       i_vif                  = in_dut_interface;
       o_vif                  = out_dut_interface;
-      driver                 = new( i_vif, o_vif, generated_transactions );
-      in_monitor             = new( i_vif, input_data );
-      out_monitor            = new( o_vif, output_data );
-      scoreboard             = new( input_data, output_data );
+      in_driver              = new( i_vif );
+      out_driver             = new( o_vif );
+      in_monitor             = new( i_vif, input_data, in_channel );
+      out_monitor            = new( o_vif, output_data, out_channel );
+      scoreboard             = new( input_data, output_data, in_channel, out_channel );
       generator              = new( generated_transactions );
       
     endfunction
     
     task run;
+
+      Transaction tr;
     
       generator.run();
 
-      driver.init();
+      in_driver.flush_in();
+      out_driver.flush_out();
   
       @( posedge i_vif.clk );
-      fork 
-        driver.run();
-        in_monitor.run();
-        out_monitor.run();
-      join
+      
+      while ( generated_transactions.num() )
+        begin
+          generated_transactions.get(tr);
 
-      scoreboard.run();
+          fork 
+            in_driver.drive_in(tr);
+            out_driver.drive_out(tr);
+            in_monitor.run();
+            out_monitor.run();
+          join
+
+          scoreboard.run();
+        end
         
     endtask
   
